@@ -33,7 +33,7 @@ export function DesktopPrimaryNav({ navItems }: Pick<NavProps, "navItems">) {
   const pathname = usePathname();
 
   return (
-    <nav className="hidden flex-1 items-center justify-center gap-1.5 px-4 lg:flex xl:px-8">
+    <nav className="hidden flex-1 items-center justify-center gap-0.5 px-2 lg:flex xl:px-6">
       {navItems.map((item) => {
         const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href.split("?")[0]);
         return (
@@ -41,13 +41,13 @@ export function DesktopPrimaryNav({ navItems }: Pick<NavProps, "navItems">) {
             key={item.label}
             href={item.href}
             className={cn(
-              "relative inline-flex min-h-[44px] items-center justify-center rounded-full px-4 py-2.5 text-[0.94rem] font-medium tracking-[0.01em] text-white/84 transition duration-200 hover:bg-white/[0.055] hover:text-white xl:px-5 xl:text-[0.98rem]",
-              isActive ? "bg-white/[0.075] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" : "",
+              "relative inline-flex min-h-[40px] items-center justify-center rounded-full px-3.5 py-2 text-[0.9rem] font-medium tracking-[0.008em] text-white/82 transition duration-200 hover:bg-white/[0.045] hover:text-white xl:px-4 xl:text-[0.95rem]",
+              isActive ? "bg-white/[0.035] text-white" : "",
             )}
           >
             {item.label}
             {isActive ? (
-              <span className="absolute inset-x-4 bottom-1.5 h-[2px] rounded-full bg-[#D71920] xl:inset-x-5" />
+              <span className="absolute inset-x-5 bottom-1.5 h-px rounded-full bg-[#E4554B] opacity-90 xl:inset-x-6" />
             ) : null}
           </Link>
         );
@@ -66,11 +66,11 @@ export function DesktopUtilityNav({
   );
 
   return (
-    <div className="hidden shrink-0 items-center gap-2.5 lg:flex">
+    <div className="hidden shrink-0 items-center gap-2 lg:flex">
       <Link
         href="/search"
         aria-label="Search"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-white/88 transition hover:border-white/18 hover:bg-white/[0.08] hover:text-white"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-white/88 transition hover:border-white/18 hover:bg-white/[0.08] hover:text-white"
       >
         <Search className="h-4 w-4" />
       </Link>
@@ -79,7 +79,7 @@ export function DesktopUtilityNav({
         <Link
           href="/account/notifications"
           aria-label="Notifications"
-          className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-white/88 transition hover:border-white/18 hover:bg-white/[0.08] hover:text-white"
+          className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-white/88 transition hover:border-white/18 hover:bg-white/[0.08] hover:text-white"
         >
           <Bell className="h-4 w-4" />
           {unreadCount ? (
@@ -92,7 +92,7 @@ export function DesktopUtilityNav({
 
       <Link
         href="/pricing"
-        className="inline-flex h-10 min-w-[144px] items-center justify-center rounded-full bg-[#D71920] px-6 text-sm font-semibold whitespace-nowrap text-white shadow-[0_12px_24px_rgba(215,25,32,0.22)] transition hover:bg-[#bf171d] hover:shadow-[0_14px_28px_rgba(215,25,32,0.26)]"
+        className="inline-flex h-9 min-w-[144px] items-center justify-center rounded-full bg-[#D71920] px-5 text-sm font-semibold whitespace-nowrap text-white shadow-[0_12px_24px_rgba(215,25,32,0.22)] transition hover:bg-[#bf171d] hover:shadow-[0_14px_28px_rgba(215,25,32,0.26)]"
       >
         Subscribe
       </Link>
@@ -122,7 +122,7 @@ export function NewsroomNavigation({ notifications, isLoggedIn, navItems }: NavP
         <Link
           href="/search"
           aria-label="Search"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-white/88"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-white/88"
         >
           <Search className="h-4 w-4" />
         </Link>
@@ -130,7 +130,7 @@ export function NewsroomNavigation({ notifications, isLoggedIn, navItems }: NavP
           <Link
             href="/account/notifications"
             aria-label="Notifications"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-white/88"
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-white/88"
           >
             <Bell className="h-4 w-4" />
             {unreadCount ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--accent)]" /> : null}

@@ -62,21 +62,21 @@ export async function SiteHeader({ brand }: { brand: BrandConfig }) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-900 bg-[#04111F] text-white shadow-[0_10px_30px_rgba(0,0,0,0.28)]">
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-5 px-4 sm:px-8 lg:h-[84px] lg:gap-8 lg:px-8">
-        <div className="flex w-[300px] shrink-0 items-center xl:w-[340px]">
+      <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4 px-4 sm:px-8 lg:h-[74px] lg:gap-6 lg:px-8 xl:gap-8">
+        <div className="flex w-[274px] shrink-0 items-center xl:w-[300px]">
           <Link href="/" className="flex w-full items-center gap-3.5">
-            <div className="relative h-11 w-11 shrink-0 md:h-12 md:w-12 lg:h-[3.35rem] lg:w-[3.35rem]">
+            <div className="relative h-10 w-10 shrink-0 md:h-11 md:w-11 lg:h-12 lg:w-12">
               <Image
                 src={brand.logoUrl}
                 alt={`${brand.name} logo`}
                 fill
-                sizes="(max-width: 768px) 44px, (max-width: 1024px) 48px, 56px"
+                sizes="(max-width: 768px) 40px, (max-width: 1024px) 44px, 48px"
                 className="object-contain"
                 priority
               />
             </div>
-            <div className="min-w-0 pb-0.5">
-              <div className="text-[1.08rem] font-semibold leading-none tracking-[0.01em] text-white sm:text-[1.16rem] lg:text-[1.28rem]">
+            <div className="min-w-0">
+              <div className="text-[1rem] font-semibold leading-none tracking-[0.01em] text-white sm:text-[1.08rem] lg:text-[1.18rem]">
                 {brand.name}
               </div>
             </div>
@@ -98,12 +98,12 @@ export async function SiteHeader({ brand }: { brand: BrandConfig }) {
       </div>
 
       <div className="bg-[linear-gradient(90deg,#cf1118_0%,#d71920_52%,#bf1217_100%)] text-white">
-        <div className="mx-auto flex max-w-[1600px] items-center gap-3 px-4 py-3 sm:px-8 lg:px-8">
-          <div className="inline-flex shrink-0 items-center gap-2 rounded-md bg-black/14 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em]">
+        <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-4 py-2.5 sm:px-8 lg:px-8">
+          <div className="inline-flex shrink-0 items-center gap-2 rounded-md bg-black/14 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em]">
             <Zap className="h-3.5 w-3.5 fill-current" />
             Breaking News
           </div>
-          <div className="min-w-0 flex-1 overflow-hidden text-sm">
+          <div className="min-w-0 flex-1 overflow-hidden text-[13px] sm:text-sm">
             <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
               <span className="truncate font-medium">
                 {breakingBanner?.title ?? seedBundle.breakingBanners[0]?.title ?? `${brand.name} newsroom is live with edition-specific coverage`}

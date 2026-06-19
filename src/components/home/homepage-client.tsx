@@ -264,10 +264,10 @@ function StoryTile({
 
 function LatestSidebar({ items }: { items: LatestSidebarItem[] }) {
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-white p-4 shadow-[0_14px_30px_rgba(15,23,42,0.06)] sm:p-5">
+    <div className="flex h-full flex-col rounded-2xl border border-[var(--border)] bg-white p-4 shadow-[0_14px_30px_rgba(15,23,42,0.06)] sm:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-serif text-[1.9rem] leading-tight text-[var(--foreground)]">Latest News</h2>
+          <h2 className="font-serif text-[1.7rem] leading-tight text-[var(--foreground)]">Latest News</h2>
           <div className="mt-2 h-0.5 w-12 bg-[#D8261D]" />
         </div>
         <Link href="/latest" className="text-sm font-medium text-[var(--accent)] underline underline-offset-4">
@@ -275,21 +275,21 @@ function LatestSidebar({ items }: { items: LatestSidebarItem[] }) {
         </Link>
       </div>
 
-      <div className="space-y-2.5">
+      <div className="flex-1 space-y-1.5">
         {items.slice(0, 8).map((item) => (
           <StoryAnchor
             key={item.id}
             href={item.href}
             isExternal={item.isExternal}
-            className="flex items-start gap-3 border-t border-[var(--border)] pt-2.5 first:border-t-0 first:pt-0"
+            className="flex items-start gap-3 border-t border-[var(--border)] pt-2 first:border-t-0 first:pt-0"
           >
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.14em]">
+              <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.13em]">
                 <span className="font-semibold text-[#D8261D]">{formatRelativeTime(item.publishedAt)}</span>
                 <span className="text-slate-400">|</span>
                 <span className="text-[var(--accent)]">{item.category}</span>
               </div>
-              <div className="mt-1 text-[1rem] leading-6 text-[var(--foreground)]">{item.headline}</div>
+              <div className="mt-1 text-[0.98rem] font-medium leading-6 text-[var(--foreground)]">{item.headline}</div>
             </div>
             <Bookmark className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
           </StoryAnchor>
@@ -319,7 +319,7 @@ function LeadHeroCard({ article }: { article: EditorialStory }) {
       isExternal={article.isExternal}
       className="group block overflow-hidden rounded-2xl border border-[color:rgba(15,23,42,0.12)] shadow-[0_24px_48px_rgba(15,23,42,0.11)]"
     >
-      <div className={hasHeroImage ? "relative min-h-[420px] sm:min-h-[470px] lg:min-h-[520px]" : "bg-white p-5 sm:p-7 lg:p-9"}>
+      <div className={hasHeroImage ? "relative min-h-[392px] sm:min-h-[432px] lg:min-h-[468px]" : "bg-white p-5 sm:p-7 lg:p-8"}>
         {hasHeroImage ? (
           <>
             <SafeNewsImage
@@ -328,16 +328,16 @@ function LeadHeroCard({ article }: { article: EditorialStory }) {
               priority
               quality={100}
               sizes="(max-width: 767px) 100vw, (max-width: 1279px) 100vw, 900px"
-              className="object-cover object-center"
+              className="object-cover object-[center_34%]"
               onVisibilityChange={setHeroVisible}
             />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,18,0.86)_0%,rgba(5,10,18,0.55)_38%,rgba(5,10,18,0.18)_72%,rgba(5,10,18,0.1)_100%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,18,0.9)_0%,rgba(5,10,18,0.6)_38%,rgba(5,10,18,0.22)_72%,rgba(5,10,18,0.14)_100%)]" />
           </>
         ) : null}
-        <div className={hasHeroImage ? "absolute inset-0 flex items-end p-5 sm:p-7 lg:p-9" : "flex items-end"}>
-          <div className={hasHeroImage ? "max-w-[700px] text-white" : "max-w-[760px]"}>
+        <div className={hasHeroImage ? "absolute inset-0 flex items-end p-5 sm:p-7 lg:p-8" : "flex items-end"}>
+          <div className={hasHeroImage ? "max-w-[640px] text-white" : "max-w-[760px]"}>
             <Badge className="border-0 bg-[#D8261D] text-white shadow-none">{article.category}</Badge>
-            <h1 className="mt-4 max-w-[700px] font-serif text-[clamp(42px,4vw,58px)] leading-[1.05] tracking-[-0.02em]">
+            <h1 className="mt-4 max-w-[660px] font-serif text-[clamp(33px,3vw,45px)] leading-[1.12] tracking-[-0.02em]">
               {article.title}
             </h1>
             <p className={hasHeroImage ? "mt-4 max-w-[36rem] text-sm leading-7 text-white/82 sm:text-base" : "mt-4 max-w-[42rem] text-sm leading-7 text-[var(--muted-foreground)] sm:text-base"}>
@@ -663,8 +663,8 @@ export function HomepageClient({
         </section>
       ) : null}
       <section className="border-b border-[var(--border)] bg-[#F8F8F8]">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,2.1fr)_340px] xl:grid-cols-[minmax(0,2.25fr)_0.95fr] xl:gap-5">
+        <div className="mx-auto max-w-[1480px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,68fr)_minmax(320px,32fr)] xl:grid-cols-[minmax(0,70fr)_minmax(330px,30fr)] xl:gap-5">
             <MotionDiv initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
               <LeadHeroCard article={{ ...bundle.heroStory, featuredImageUrl: heroStoryImage }} />
             </MotionDiv>
@@ -679,19 +679,19 @@ export function HomepageClient({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-5 flex items-center gap-3">
+      <section className="mx-auto max-w-[1480px] px-4 py-7 sm:px-6 lg:px-8">
+        <div className="mb-4 flex items-center gap-3">
           <span className="h-6 w-1 rounded-full bg-[#D8261D]" />
           <h2 className="text-xl font-semibold uppercase tracking-[0.08em] text-[var(--foreground)]">Top Stories</h2>
         </div>
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {topStoryCards.map((story) => (
             <TopStoryCard key={story.title} story={story} />
           ))}
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-7 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[1480px] px-4 pb-6 sm:px-6 lg:px-8">
         <TrendingNow
           items={trendingStories.map((story) => ({
             id: story.id,
@@ -703,8 +703,8 @@ export function HomepageClient({
         />
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
+      <section className="mx-auto max-w-[1480px] px-4 pb-7 sm:px-6 lg:px-8">
+        <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
           {sectionPanels.map((panel) => (
             <SectionPanel
               key={panel.title}
@@ -717,7 +717,7 @@ export function HomepageClient({
       </section>
 
       {personalized ? (
-        <section className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8">
+        <section className="mx-auto max-w-[1480px] px-4 pb-4 sm:px-6 lg:px-8">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <Card className="border-[var(--accent)]">
               <CardHeader>
@@ -767,16 +767,16 @@ export function HomepageClient({
         </section>
       ) : null}
 
-      <section className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[1480px] px-4 py-7 sm:px-6 lg:px-8">
         <SectionHeader title="Live Coverage" href="/live" label="Developing Story" />
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           <Card className="border-[var(--accent)]">
             <CardHeader>
               <div className="flex items-center gap-2 text-[var(--accent)]">
                 <RadioTower className="h-4 w-4" />
                 <span className="text-xs uppercase tracking-[0.2em]">Live</span>
               </div>
-              <CardTitle className="font-serif text-3xl">{liveLeadStory?.title}</CardTitle>
+              <CardTitle className="font-serif text-[1.75rem] leading-tight">{liveLeadStory?.title}</CardTitle>
               <CardDescription>{liveLeadStory?.summary}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm leading-7 text-[var(--muted-foreground)]">
@@ -837,18 +837,18 @@ export function HomepageClient({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[1480px] px-4 py-7 sm:px-6 lg:px-8">
         <SectionHeader title="Latest Opinion" href="/search?articleType=OPINION" label="Commentary" />
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-5 lg:grid-cols-2">
           {opinionStories.map(({ story, image }) => (
             <Link
               key={story.id}
               href={story.href ?? `/articles/${story.slug}`}
-              className="grid gap-4 rounded-2xl border border-[var(--border)] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 md:grid-cols-[1fr_220px]"
+              className="grid gap-4 rounded-2xl border border-[var(--border)] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 md:grid-cols-[1fr_212px]"
             >
               <div>
                 <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--accent)]">{story.category}</div>
-                <h3 className="mt-2 font-serif text-[1.25rem] leading-tight text-[var(--foreground)]">{story.title}</h3>
+                <h3 className="mt-2 font-serif text-[1.15rem] leading-[1.25] text-[var(--foreground)]">{story.title}</h3>
                 <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">{story.summary}</p>
                 <div className="mt-4 text-sm text-[var(--muted-foreground)]">
                   {story.author.name} | {formatRelativeTime(story.publishedAt)}
@@ -868,9 +868,9 @@ export function HomepageClient({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[1480px] px-4 py-7 sm:px-6 lg:px-8">
         <SectionHeader title="Most Read" href="/most-read" label="Reader Demand" />
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {mostReadStories.map(({ story, image }) => (
             <StoryTile key={story.id} article={story} compact image={image} />
           ))}
