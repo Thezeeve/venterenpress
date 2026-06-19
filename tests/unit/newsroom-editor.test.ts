@@ -1,0 +1,204 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createElement, type ReactNode } from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Role } from "@prisma/client";
+import { NewsroomEditor } from "@/components/editor/newsroom-editor";
+
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) =>
+    createElement("a", { href, ...props }, children),
+}));
+
+vi.mock("next/image", () => ({
+  default: ({ src, alt, ...props }: { src: string; alt: string }) =>
+    createElement("img", { src, alt, ...props }),
+}));
+
+vi.mock("@tiptap/react", () => ({
+  useEditor: () => ({
+    getHTML: () => "<p>Lead paragraph.</p>",
+    chain: () => ({
+      focus: () => ({
+        toggleHeading: () => ({ run: () => undefined }),
+        toggleBlockquote: () => ({ run: () => undefined }),
+        toggleBulletList: () => ({ run: () => undefined }),
+      }),
+    }),
+  }),
+  EditorContent: () => createElement("div", { "data-testid": "editor-content" }),
+}));
+
+const categoryOptions = [{ label: "Technology", value: "technology" }];
+const editionOptions = [{ label: "United States", value: "UNITED_STATES" }];
+
+describe("NewsroomEditor upload support", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    if (!("createObjectURL" in URL)) {
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        value: vi.fn(() => "blob:preview-image"),
+      });
+    } else {
+      vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview-image");
+    }
+
+    if (!("revokeObjectURL" in URL)) {
+      Object.defineProperty(URL, "revokeObjectURL", {
+        configurable: true,
+        value: vi.fn(),
+      });
+    } else {
+      vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    }
+  });
+
+  it("renders the image upload field", () => {
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Upload image" })).toBeVisible();
+    expect(screen.getByPlaceholderText("Image URL")).toBeVisible();
+  });
+
+  it("rejects unsupported file types", () => {
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["not an image"], "bad.txt", { type: "text/plain" });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(screen.getByText("Upload JPG, PNG, or WEBP files only.")).toBeVisible();
+  });
+
+  it("shows an uploaded image preview and saves the public url", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            upload: {
+              uploadUrl: "https://storage.local/upload/one",
+              publicUrl: "https://cdn.example.com/images/article.png",
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { id: "article-1", slug: "global-chip-alliances" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    class MockXHR {
+      status = 200;
+      upload = {
+        onprogress: null as null | ((event: ProgressEvent) => void),
+      };
+      onload: null | (() => void) = null;
+      onerror: null | (() => void) = null;
+      open = vi.fn();
+      setRequestHeader = vi.fn();
+      send = () => {
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 50, total: 100 } as ProgressEvent);
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 100, total: 100 } as ProgressEvent);
+        this.onload?.();
+      };
+    }
+    vi.stubGlobal("XMLHttpRequest", MockXHR);
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array([1, 2, 3])], "image.png", { type: "image/png" });
+    await user.upload(input, file);
+
+    expect(await screen.findByRole("img", { name: "Article image preview" })).toBeVisible();
+    await waitFor(() => expect(screen.getByText("Image uploaded successfully.")).toBeVisible());
+
+    await user.type(screen.getByPlaceholderText("Article headline"), "Global chip alliances reshape AI infrastructure competition");
+    await user.type(screen.getByPlaceholderText("Slug"), "global-chip-alliances");
+    await user.type(
+      screen.getByPlaceholderText("Excerpt"),
+      "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+    );
+    await user.type(screen.getByPlaceholderText("Categories, comma separated"), "technology");
+    await user.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/rest/articles",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const requestBody = JSON.parse((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string);
+    expect(requestBody.featuredImageUrl).toBe("https://cdn.example.com/images/article.png");
+  }, 15000);
+
+  it("keeps manual image url fallback working", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: "article-2", slug: "manual-image-story" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
+      target: { value: "Global chip alliances reshape AI infrastructure competition" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Slug"), {
+      target: { value: "manual-image-story" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
+      target: {
+        value:
+          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+      },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
+      target: { value: "technology" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Image URL"), {
+      target: { value: "https://cdn.example.com/manual.jpg" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/rest/articles",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const requestBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(requestBody.featuredImageUrl).toBe("https://cdn.example.com/manual.jpg");
+  });
+});
