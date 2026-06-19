@@ -101,6 +101,7 @@ export const assignmentSchema = z.object({
 export const mediaUploadRequestSchema = z.object({
   fileName: z.string().min(3).max(180),
   contentType: z.string().min(3).max(120),
+  sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
   type: z.enum([
     "IMAGE",
     "VIDEO",

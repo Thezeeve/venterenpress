@@ -6,6 +6,8 @@ import { createPresignedUpload } from "@/lib/storage";
 import { validateBrowserMutation } from "@/lib/security";
 import { mediaUploadRequestSchema } from "@/lib/validation";
 
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 export async function POST(request: NextRequest) {
   const browserCheck = validateBrowserMutation(request);
   if (!browserCheck.ok) {
@@ -28,18 +30,28 @@ export async function POST(request: NextRequest) {
     parsed.data.type === "IMAGE" &&
     !["image/jpeg", "image/png", "image/webp"].includes(parsed.data.contentType.toLowerCase())
   ) {
-    return NextResponse.json({ error: "Unsupported image type" }, { status: 400 });
+    return NextResponse.json({ error: "Upload JPG, JPEG, PNG, or WEBP images only." }, { status: 400 });
   }
 
   if (parsed.data.type === "IMAGE" && !/\.(jpe?g|png|webp)$/i.test(parsed.data.fileName)) {
-    return NextResponse.json({ error: "Unsupported image file extension" }, { status: 400 });
+    return NextResponse.json({ error: "Upload JPG, JPEG, PNG, or WEBP images only." }, { status: 400 });
   }
 
-  const signed = await createPresignedUpload({
-    fileName: parsed.data.fileName,
-    contentType: parsed.data.contentType,
-    type: parsed.data.type,
-  });
+  if (parsed.data.type === "IMAGE" && parsed.data.sizeBytes > MAX_IMAGE_UPLOAD_BYTES) {
+    return NextResponse.json({ error: "Image must be 10MB or smaller." }, { status: 400 });
+  }
+
+  let signed;
+  try {
+    signed = await createPresignedUpload({
+      fileName: parsed.data.fileName,
+      contentType: parsed.data.contentType,
+      type: parsed.data.type,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to prepare storage upload.";
+    return NextResponse.json({ error: message }, { status: 503 });
+  }
 
   const media = await prisma.mediaAsset.create({
     data: {

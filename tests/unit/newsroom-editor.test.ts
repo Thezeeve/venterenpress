@@ -84,6 +84,27 @@ describe("NewsroomEditor upload support", () => {
     expect(screen.getByText("Upload JPG, PNG, or WEBP files only.")).toBeVisible();
   });
 
+  it("rejects oversized images before requesting a presigned upload", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "too-large.png", { type: "image/png" });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(screen.getByText("Image must be 10MB or smaller.")).toBeVisible();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("shows an uploaded image preview and saves the public url", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn()
@@ -151,6 +172,9 @@ describe("NewsroomEditor upload support", () => {
         expect.objectContaining({ method: "POST" }),
       );
     });
+
+    const presignBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(presignBody.sizeBytes).toBe(3);
 
     const requestBody = JSON.parse((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string);
     expect(requestBody.featuredImageUrl).toBe("https://cdn.example.com/images/article.png");

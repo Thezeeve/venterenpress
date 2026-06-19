@@ -192,6 +192,7 @@ export function NewsroomEditor({
         body: JSON.stringify({
           fileName: file.name,
           contentType: file.type,
+          sizeBytes: file.size,
           type: "IMAGE",
           title: title.trim() || file.name,
           altText: featuredImageAlt.trim() || title.trim() || file.name,
@@ -227,9 +228,9 @@ export function NewsroomEditor({
             return;
           }
 
-          reject(new Error("Image upload failed."));
+          reject(new Error(`Image upload failed with status ${xhr.status}.`));
         };
-        xhr.onerror = () => reject(new Error("Image upload failed."));
+        xhr.onerror = () => reject(new Error("Image upload failed while sending data to storage."));
         xhr.send(file);
       });
 

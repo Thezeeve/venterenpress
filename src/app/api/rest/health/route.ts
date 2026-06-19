@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getHomepageNewsResponse, getNewsMode } from "@/lib/news-providers";
+import { getStorageHealth } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ function toProviderHealth(status: "idle" | "success" | "error" | "skipped") {
 }
 
 export async function GET() {
-  const [databaseStatus, homepageNews] = await Promise.all([
+  const [databaseStatus, homepageNews, storage] = await Promise.all([
     (async () => {
       try {
         await prisma.$queryRaw`SELECT 1`;
@@ -19,10 +20,12 @@ export async function GET() {
       }
     })(),
     getHomepageNewsResponse(),
+    getStorageHealth(),
   ]);
 
   return NextResponse.json({
     database: databaseStatus,
+    storage,
     newsMode: getNewsMode(),
     lastUpdated: homepageNews.lastUpdated,
     gnews: toProviderHealth(homepageNews.providerStatus.gnews.status),

@@ -69,6 +69,29 @@ npm run worker
 
 MinIO console: `http://localhost:9001`
 
+## Cloudflare R2 media uploads
+
+The article image upload flow already uses S3-compatible presigned uploads. Cloudflare R2 works with the existing implementation by pointing the storage env vars at your R2 bucket.
+
+Use this configuration:
+
+```env
+S3_ENDPOINT="https://ACCOUNT_ID.r2.cloudflarestorage.com"
+S3_REGION="auto"
+S3_BUCKET="vanterenpress-media"
+S3_ACCESS_KEY_ID="R2_ACCESS_KEY_ID"
+S3_SECRET_ACCESS_KEY="R2_SECRET_ACCESS_KEY"
+S3_PUBLIC_BASE_URL="https://PUBLIC_R2_URL_OR_CUSTOM_DOMAIN"
+S3_FORCE_PATH_STYLE="false"
+```
+
+Important details:
+
+- `S3_ENDPOINT` must be the R2 S3 API endpoint. Presigned uploads are generated against this endpoint.
+- `S3_PUBLIC_BASE_URL` must be the public R2 asset URL or your custom domain. Rendered article images use this value instead of the S3 API endpoint.
+- `/api/rest/health` now reports storage configuration and bucket reachability so you can verify the R2 connection after deployment.
+- If any required storage env var is missing, the upload API returns a clear storage configuration error instead of a generic upload failure.
+
 ## Free news setup
 
 The homepage ingestion layer supports two modes:
@@ -309,7 +332,7 @@ Notes:
 - `REDIS_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
-- `S3_PUBLIC_URL_BASE`, `S3_FORCE_PATH_STYLE`, `CDN_BASE_URL`
+- `S3_PUBLIC_BASE_URL`, `S3_FORCE_PATH_STYLE`, `CDN_BASE_URL`
 - `EMAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `RESEND_API_KEY`
 - `PAYMENT_PROVIDER`, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `FREE_ARTICLE_LIMIT`, `PAYWALL_PREMIUM_LABEL`

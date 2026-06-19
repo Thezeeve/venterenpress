@@ -37,4 +37,4 @@ Global Press Network uses an S3-compatible storage abstraction in `src/lib/stora
 - Add image derivative generation and blur placeholder generation.
 - Add malware scanning for uploaded binaries.
 - Attach storage lifecycle rules for large video and audio archives.
-- Put a CDN in front of `S3_PUBLIC_URL_BASE`.
+- Put a CDN or Cloudflare R2 custom domain in front of `S3_PUBLIC_BASE_URL`.

@@ -16,7 +16,7 @@ export type EditorFormValues = {
 export type EditorSubmitIntent = "draft" | "publish";
 
 export const ARTICLE_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
-export const ARTICLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const ARTICLE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function decodeHtmlEntities(value: string) {
@@ -101,7 +101,7 @@ export function validateArticleImageFile(file: File) {
   }
 
   if (file.size > ARTICLE_IMAGE_MAX_BYTES) {
-    return "Image must be 5MB or smaller.";
+    return "Image must be 10MB or smaller.";
   }
 
   return null;

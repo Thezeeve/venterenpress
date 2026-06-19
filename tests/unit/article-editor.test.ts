@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARTICLE_IMAGE_MAX_BYTES,
   articleBodyToEditorHtml,
   buildArticlePayload,
   htmlToArticleBody,
+  validateArticleImageFile,
   validateEditorValues,
 } from "@/lib/article-editor";
 
@@ -92,5 +94,13 @@ describe("article editor helpers", () => {
 
     expect(html).toContain("<h2>Heading</h2>");
     expect(html).toContain("<p>Body copy</p>");
+  });
+
+  it("allows image uploads up to 10MB and rejects larger files", () => {
+    const allowedFile = new File([new Uint8Array(ARTICLE_IMAGE_MAX_BYTES)], "hero.jpeg", { type: "image/jpeg" });
+    const oversizedFile = new File([new Uint8Array(ARTICLE_IMAGE_MAX_BYTES + 1)], "hero.jpeg", { type: "image/jpeg" });
+
+    expect(validateArticleImageFile(allowedFile)).toBeNull();
+    expect(validateArticleImageFile(oversizedFile)).toBe("Image must be 10MB or smaller.");
   });
 });
