@@ -28,6 +28,42 @@ function normalizeUrlBase(value: string) {
   return value.replace(/\/$/, "");
 }
 
+function normalizeEndpoint(value: string, bucket: string) {
+  try {
+    const endpointUrl = new URL(value);
+    const normalizedEndpoint = endpointUrl.origin;
+
+    if (endpointUrl.pathname !== "/" && endpointUrl.pathname !== "") {
+      console.warn("Storage endpoint included a path component. Normalizing to the API origin for S3-compatible signing.", {
+        configuredEndpoint: value,
+        normalizedEndpoint,
+        bucket,
+      });
+    }
+
+    return normalizedEndpoint;
+  } catch {
+    return normalizeUrlBase(value);
+  }
+}
+
+function describeSignedUrl(uploadUrl: string) {
+  try {
+    const parsed = new URL(uploadUrl);
+    return {
+      origin: parsed.origin,
+      pathname: parsed.pathname,
+      searchKeys: Array.from(parsed.searchParams.keys()),
+    };
+  } catch {
+    return {
+      origin: null,
+      pathname: null,
+      searchKeys: [],
+    };
+  }
+}
+
 function getPublicBaseUrl() {
   return process.env.S3_PUBLIC_BASE_URL ?? process.env.S3_PUBLIC_URL_BASE ?? "";
 }
@@ -75,7 +111,7 @@ export function getStorageConfig() {
     ok: true as const,
     config: {
       ...config,
-      endpoint: normalizeUrlBase(config.endpoint),
+      endpoint: normalizeEndpoint(config.endpoint, config.bucket),
       publicBaseUrl: normalizeUrlBase(config.publicBaseUrl),
     },
   };
@@ -149,25 +185,59 @@ export async function createPresignedUpload(input: {
   type: MediaType;
 }) {
   const config = requireStorageConfig();
+  console.info("Creating presigned media upload", {
+    provider: "cloudflare-r2",
+    endpoint: config.endpoint,
+    region: config.region,
+    bucket: config.bucket,
+    publicBaseUrl: config.publicBaseUrl,
+    fileName: input.fileName,
+    contentType: input.contentType,
+    type: input.type,
+  });
+
   const [{ PutObjectCommand }, { getSignedUrl }, s3Client] = await Promise.all([
     import("@aws-sdk/client-s3"),
     import("@aws-sdk/s3-request-presigner"),
     getS3Client(),
   ]);
   const objectKey = buildObjectKey(input.type, input.fileName);
-  const command = new PutObjectCommand({
-    Bucket: config.bucket,
-    Key: objectKey,
-    ContentType: input.contentType,
-  });
-  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 900 });
 
-  return {
-    bucket: config.bucket,
-    objectKey,
-    uploadUrl,
-    publicUrl: buildPublicUrl(objectKey),
-  };
+  try {
+    const command = new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+      ContentType: input.contentType,
+    });
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 900 });
+    const publicUrl = buildPublicUrl(objectKey);
+
+    console.info("Created presigned media upload", {
+      provider: "cloudflare-r2",
+      bucket: config.bucket,
+      objectKey,
+      contentType: input.contentType,
+      uploadUrl: describeSignedUrl(uploadUrl),
+      publicUrl,
+    });
+
+    return {
+      bucket: config.bucket,
+      objectKey,
+      uploadUrl,
+      publicUrl,
+    };
+  } catch (error) {
+    console.error("Failed to create presigned media upload", {
+      provider: "cloudflare-r2",
+      endpoint: config.endpoint,
+      bucket: config.bucket,
+      objectKey,
+      contentType: input.contentType,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error,
+    });
+    throw error;
+  }
 }
 
 export async function getStorageHealth() {
@@ -201,6 +271,12 @@ export async function getStorageHealth() {
       publicBaseUrl: result.config.publicBaseUrl,
     };
   } catch (error) {
+    console.error("Storage health check failed", {
+      provider: "cloudflare-r2",
+      bucket: result.config.bucket,
+      endpoint: result.config.endpoint,
+      error: error instanceof Error ? { name: error.name, message: error.message } : error,
+    });
     return {
       status: "error" as const,
       configured: true,

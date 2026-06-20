@@ -31,6 +31,23 @@ describe("storage configuration", () => {
     });
   });
 
+  it("normalizes an R2 endpoint that was configured with a bucket path", () => {
+    process.env.S3_ENDPOINT = "https://account-id.r2.cloudflarestorage.com/vanterenpress-media";
+
+    expect(getStorageConfig()).toEqual({
+      ok: true,
+      config: {
+        endpoint: "https://account-id.r2.cloudflarestorage.com",
+        region: "auto",
+        bucket: "vanterenpress-media",
+        accessKeyId: "R2_ACCESS_KEY_ID",
+        secretAccessKey: "R2_SECRET_ACCESS_KEY",
+        publicBaseUrl: "https://media.vanterenpress.com",
+        forcePathStyle: false,
+      },
+    });
+  });
+
   it("builds displayed asset urls from the public base url", () => {
     expect(buildPublicUrl("images/2026/example.png")).toBe(
       "https://media.vanterenpress.com/images/2026/example.png",

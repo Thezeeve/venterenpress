@@ -285,6 +285,11 @@ export async function updateArticle(input: {
     },
     include: articleInclude,
   });
+  console.info("Updated article featured image", {
+    articleId: updated.id,
+    slug: updated.slug,
+    featuredImageUrl: updated.featuredImageUrl,
+  });
 
   if (updated.status === ArticleStatus.SCHEDULED && updated.scheduledFor) {
     await enqueueScheduledPublish(updated.id, updated.scheduledFor);

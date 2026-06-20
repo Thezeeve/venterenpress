@@ -1,6 +1,6 @@
 import { isDatabaseAvailable } from "@/lib/database-availability";
+import { resolveArticleHeroImage } from "@/lib/article-rendering";
 import { getHomepageNewsResponse } from "@/lib/news-providers";
-import { resolveNewsImageSelection } from "@/lib/news-providers/sanitize-news-image";
 import type { EditorialStory, HomepageNewsBundle } from "@/lib/news-providers/types";
 import type { NewsroomArticleCard } from "@/lib/newsroom";
 import { prisma } from "@/lib/prisma";
@@ -136,19 +136,9 @@ function resolveStoryImage(input: {
   title: string;
   summary: string;
   featuredImageUrl?: string | null;
+  imageUrl?: string | null;
 }) {
-  if (input.featuredImageUrl) {
-    return input.featuredImageUrl;
-  }
-
-  return resolveNewsImageSelection({
-    slug: input.slug,
-    category: input.category,
-    title: input.title,
-    summary: input.summary,
-    preferPremium: true,
-    minimumScore: 28,
-  }).imageUrl;
+  return resolveArticleHeroImage(input);
 }
 
 type PublicArticleSource = Pick<NewsroomArticleCard, "id" | "slug" | "title" | "excerpt" | "articleType" | "publishedAt" | "edition" | "categories"> & {

@@ -1,7 +1,19 @@
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { formatArticleMutationError, getArticleById, softDeleteArticle, updateArticle } from "@/lib/articles";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleInputSchema } from "@/lib/validation";
+
+function revalidateArticlePaths(slug: string, categorySlugs: string[]) {
+  revalidatePath("/");
+  revalidatePath("/latest");
+  revalidatePath(`/articles/${slug}`);
+
+  for (const categorySlug of categorySlugs) {
+    revalidatePath(`/categories/${categorySlug}`);
+    revalidatePath(`/${categorySlug}`);
+  }
+}
 
 export async function GET(
   _request: NextRequest,
@@ -43,6 +55,7 @@ export async function PATCH(
       articleId: id,
       data: parsed.data,
     });
+    revalidateArticlePaths(article.slug, parsed.data.categorySlugs);
 
     return NextResponse.json({ data: article });
   } catch (error) {

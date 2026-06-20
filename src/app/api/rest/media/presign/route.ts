@@ -9,6 +9,11 @@ import { mediaUploadRequestSchema } from "@/lib/validation";
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
+  console.info("Received media presign request", {
+    origin: request.headers.get("origin"),
+    host: request.headers.get("host"),
+  });
+
   const browserCheck = validateBrowserMutation(request);
   if (!browserCheck.ok) {
     return NextResponse.json({ error: browserCheck.error }, { status: 403 });
@@ -23,6 +28,9 @@ export async function POST(request: NextRequest) {
   const parsed = mediaUploadRequestSchema.safeParse(payload);
 
   if (!parsed.success) {
+    console.error("Invalid media presign request payload", {
+      issues: parsed.error.flatten(),
+    });
     return NextResponse.json({ error: "Invalid media request" }, { status: 400 });
   }
 
@@ -50,8 +58,26 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to prepare storage upload.";
+    console.error("Media presign generation failed", {
+      fileName: parsed.data.fileName,
+      contentType: parsed.data.contentType,
+      sizeBytes: parsed.data.sizeBytes,
+      type: parsed.data.type,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error,
+    });
     return NextResponse.json({ error: message }, { status: 503 });
   }
+
+  console.info("Media presign generated", {
+    fileName: parsed.data.fileName,
+    contentType: parsed.data.contentType,
+    sizeBytes: parsed.data.sizeBytes,
+    type: parsed.data.type,
+    bucket: signed.bucket,
+    objectKey: signed.objectKey,
+    uploadUrl: signed.uploadUrl,
+    publicUrl: signed.publicUrl,
+  });
 
   const media = await prisma.mediaAsset.create({
     data: {

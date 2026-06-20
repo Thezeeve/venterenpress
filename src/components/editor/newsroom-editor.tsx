@@ -89,6 +89,7 @@ export function NewsroomEditor({
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const blobPreviewRef = useRef<string | null>(null);
+  const featuredImageUrlRef = useRef(initialArticle?.featuredImageUrl ?? "");
 
   const editor = useEditor({
     extensions: [
@@ -150,6 +151,11 @@ export function NewsroomEditor({
     }
   }
 
+  function commitFeaturedImageUrl(nextValue: string) {
+    featuredImageUrlRef.current = nextValue;
+    setFeaturedImageUrl(nextValue);
+  }
+
   async function handleImageFile(file: File) {
     await uploadArticleImage(file);
   }
@@ -201,6 +207,11 @@ export function NewsroomEditor({
       });
 
       const presignBody = await presignResponse.json().catch(() => null);
+      console.info("Featured image presign response", {
+        status: presignResponse.status,
+        ok: presignResponse.ok,
+        body: presignBody,
+      });
       if (!presignResponse.ok) {
         throw new Error(extractApiErrorMessage(presignBody, "Unable to prepare image upload."));
       }
@@ -211,36 +222,84 @@ export function NewsroomEditor({
       }
       const uploadUrl = signedUpload.uploadUrl;
       const publicUrl = signedUpload.publicUrl;
+      console.info("Prepared featured image upload", {
+        fileName: file.name,
+        contentType: file.type,
+        sizeBytes: file.size,
+        uploadUrl,
+        publicUrl,
+      });
 
       setImageUploadMessage("Uploading image...");
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+        xhr.withCredentials = false;
         xhr.open("PUT", uploadUrl, true);
         xhr.setRequestHeader("Content-Type", file.type);
+        xhr.onloadstart = () => {
+          console.info("Starting featured image upload", {
+            fileName: file.name,
+            contentType: file.type,
+            uploadUrl,
+            withCredentials: xhr.withCredentials,
+          });
+        };
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             setImageUploadProgress(Math.max(1, Math.min(99, Math.round((event.loaded / event.total) * 100))));
           }
         };
         xhr.onload = () => {
+          const responseHeaders = typeof xhr.getAllResponseHeaders === "function" ? xhr.getAllResponseHeaders() : "";
+          console.info("Featured image upload completed", {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            responseText: xhr.responseText,
+            responseHeaders,
+            uploadUrl,
+          });
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
             return;
           }
 
-          reject(new Error(`Image upload failed with status ${xhr.status}.`));
+          reject(new Error(`Image upload failed with status ${xhr.status}. ${xhr.responseText || "No response body returned by storage."}`));
         };
-        xhr.onerror = () => reject(new Error("Image upload failed while sending data to storage."));
+        xhr.onerror = () => {
+          console.error("Featured image upload network error", {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            responseText: xhr.responseText,
+            uploadUrl,
+            fileName: file.name,
+            contentType: file.type,
+            withCredentials: xhr.withCredentials,
+            hint: "A status of 0 usually means CORS, preflight rejection, DNS, or network failure at the storage provider.",
+          });
+          reject(new Error("Image upload failed while sending data to storage. Check the browser console and Cloudflare R2 CORS configuration."));
+        };
+        xhr.onabort = () => {
+          console.error("Featured image upload aborted", {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            uploadUrl,
+          });
+          reject(new Error("Image upload was aborted before completion."));
+        };
         xhr.send(file);
       });
 
       clearLocalImagePreview();
-      setFeaturedImageUrl(publicUrl);
+      commitFeaturedImageUrl(publicUrl);
       setImagePreviewUrl(publicUrl);
       setImageUploadProgress(100);
       setImageUploadState("success");
       setImageUploadError("");
       setImageUploadMessage("Image uploaded successfully.");
+      console.info("Featured image uploaded", {
+        articleId: currentArticleId || null,
+        publicUrl,
+      });
     } catch (error) {
       setImageUploadState("error");
       setImageUploadProgress(0);
@@ -262,7 +321,7 @@ export function NewsroomEditor({
 
   function removeArticleImage() {
     clearLocalImagePreview();
-    setFeaturedImageUrl("");
+    commitFeaturedImageUrl("");
     setImagePreviewUrl("");
     setImageFileName("");
     setImageUploadState("idle");
@@ -318,12 +377,17 @@ export function NewsroomEditor({
           editionCode,
           seoTitle,
           seoDescription,
-          featuredImageUrl,
+          featuredImageUrl: featuredImageUrlRef.current,
           featuredImageAlt,
         },
         editor.getHTML(),
         intent,
       );
+      console.info("Submitting article payload", {
+        articleId: currentArticleId || null,
+        intent,
+        featuredImageUrl: payload.featuredImageUrl,
+      });
 
       const method = currentArticleId ? "PATCH" : "POST";
       const endpoint = currentArticleId ? `/api/rest/articles/${currentArticleId}` : "/api/rest/articles";
@@ -535,7 +599,7 @@ export function NewsroomEditor({
                 onChange={(event) => {
                   const nextValue = event.target.value;
                   clearLocalImagePreview();
-                  setFeaturedImageUrl(nextValue);
+                  commitFeaturedImageUrl(nextValue);
                   setImagePreviewUrl(nextValue);
                   setImageUploadState("idle");
                   setImageUploadProgress(0);

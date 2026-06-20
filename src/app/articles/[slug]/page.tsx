@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { isDatabaseAvailable } from "@/lib/database-availability";
+import { resolveArticleHeroImage, selectArticlePageSource } from "@/lib/article-rendering";
 import { getHomepageNewsResponse, getHomepageStoryBySlug } from "@/lib/news-providers";
 import { resolveNewsImageSelection } from "@/lib/news-providers/sanitize-news-image";
 import { getSeedStoryBySlug, seededEditorialStories } from "@/lib/news-providers/seed-content";
@@ -294,18 +295,13 @@ export default async function ArticlePage({
 }) {
   const { slug } = await params;
   const databaseAvailable = await isDatabaseAvailable();
-  const externalStory = await getExternalPreviewStory(slug);
-  const [article, user] = await (async () => {
-    if (externalStory) {
-      return [null, null] as const;
-    }
-
+  const [dbArticle, user, externalStory] = await (async () => {
     if (!databaseAvailable) {
-      return [getDemoArticle(slug), null] as const;
+      return [getDemoArticle(slug), null, null] as const;
     }
 
     try {
-      const [dbArticle, currentUser] = await Promise.all([
+      const [article, currentUser] = await Promise.all([
         prisma.article.findUnique({
           where: { slug },
           include: {
@@ -319,13 +315,28 @@ export default async function ArticlePage({
         getCurrentUser(),
       ] as const);
 
-      return [dbArticle ?? getDemoArticle(slug), currentUser] as const;
+      if (article) {
+        return [article, currentUser, null] as const;
+      }
+
+      return [getDemoArticle(slug), currentUser, await getExternalPreviewStory(slug)] as const;
     } catch {
-      return [getDemoArticle(slug), null] as const;
+      return [getDemoArticle(slug), null, null] as const;
     }
   })();
+  const source = selectArticlePageSource({
+    article: dbArticle,
+    externalStory,
+  });
 
-  if (!externalStory && (!article || article.deletedAt || article.status !== "PUBLISHED")) {
+  if (source.kind === "missing") {
+    notFound();
+  }
+
+  const article = source.article;
+  const resolvedExternalStory = source.externalStory;
+
+  if (!resolvedExternalStory && (!article || article.deletedAt || article.status !== "PUBLISHED")) {
     notFound();
   }
 
@@ -343,21 +354,21 @@ export default async function ArticlePage({
   ].map(toRecommendationStory);
   const trendingStories = selectTrendingStories(homepageStories, 5);
 
-  if (externalStory) {
-    const publisherName = formatPublisherName(externalStory.sourceName);
-    const deskLabel = getNewsroomDeskLabel(externalStory.category);
-    const leadText = externalStory.content[0] ?? externalStory.summary;
-    const showLeadSection = shouldShowLeadSection(externalStory.summary, leadText);
+  if (resolvedExternalStory) {
+    const publisherName = formatPublisherName(resolvedExternalStory.sourceName);
+    const deskLabel = getNewsroomDeskLabel(resolvedExternalStory.category);
+    const leadText = resolvedExternalStory.content[0] ?? resolvedExternalStory.summary;
+    const showLeadSection = shouldShowLeadSection(resolvedExternalStory.summary, leadText);
     const imageSelection = resolveNewsImageSelection({
-      slug: externalStory.slug,
-      category: externalStory.category,
-      title: externalStory.title,
-      summary: externalStory.summary,
+      slug: resolvedExternalStory.slug,
+      category: resolvedExternalStory.category,
+      title: resolvedExternalStory.title,
+      summary: resolvedExternalStory.summary,
       preferPremium: true,
       minimumScore: 28,
     });
     const relatedStories = selectRelatedStories(
-      toPreviewRecommendationStory(externalStory),
+      toPreviewRecommendationStory(resolvedExternalStory),
       homepageStories,
       3,
     );
@@ -367,21 +378,21 @@ export default async function ArticlePage({
       "@graph": [
         {
           "@type": ["NewsArticle", "Article"],
-          headline: externalStory.title,
-          description: externalStory.summary,
-          datePublished: externalStory.publishedAt,
-          articleSection: externalStory.category,
+          headline: resolvedExternalStory.title,
+          description: resolvedExternalStory.summary,
+          datePublished: resolvedExternalStory.publishedAt,
+          articleSection: resolvedExternalStory.category,
           author: {
             "@type": "Organization",
-            name: getNewsroomDeskLabel(externalStory.category),
+            name: getNewsroomDeskLabel(resolvedExternalStory.category),
           },
           publisher: {
             "@type": "Organization",
             name: siteConfig.name,
             url: siteConfig.url,
           },
-          isBasedOn: externalStory.sourceUrl ?? undefined,
-          mainEntityOfPage: `${siteConfig.url}/articles/${externalStory.slug}`,
+          isBasedOn: resolvedExternalStory.sourceUrl ?? undefined,
+          mainEntityOfPage: `${siteConfig.url}/articles/${resolvedExternalStory.slug}`,
         },
         {
           "@type": "BreadcrumbList",
@@ -395,14 +406,14 @@ export default async function ArticlePage({
             {
               "@type": "ListItem",
               position: 2,
-              name: externalStory.category,
-              item: `${siteConfig.url}/articles/${externalStory.slug}`,
+              name: resolvedExternalStory.category,
+              item: `${siteConfig.url}/articles/${resolvedExternalStory.slug}`,
             },
             {
               "@type": "ListItem",
               position: 3,
-              name: externalStory.title,
-              item: `${siteConfig.url}/articles/${externalStory.slug}`,
+              name: resolvedExternalStory.title,
+              item: `${siteConfig.url}/articles/${resolvedExternalStory.slug}`,
             },
           ],
         },
@@ -414,12 +425,12 @@ export default async function ArticlePage({
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(previewStructuredData) }} />
         <article className="rounded-[32px] bg-white px-5 py-6 shadow-[0_18px_42px_rgba(15,23,42,0.05)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
           <div className="flex flex-wrap items-center gap-3">
-            <Badge>{externalStory.category}</Badge>
+            <Badge>{resolvedExternalStory.category}</Badge>
             <Badge variant="neutral" className="px-2.5 py-1 text-[11px] tracking-[0.14em]">Syndicated report</Badge>
-            <div className="text-sm text-[var(--muted-foreground)]">{new Date(externalStory.publishedAt).toLocaleString()}</div>
+              <div className="text-sm text-[var(--muted-foreground)]">{new Date(resolvedExternalStory.publishedAt).toLocaleString()}</div>
           </div>
           <h1 className="mt-4 max-w-[920px] font-serif text-[2.1rem] leading-[1.05] tracking-[-0.015em] text-slate-950 sm:text-[2.55rem] lg:text-[2.9rem]">
-            {externalStory.title}
+            {resolvedExternalStory.title}
           </h1>
           <div className="mt-5 grid gap-3 rounded-[24px] border border-[var(--border)] bg-[var(--muted)]/28 px-4 py-4 sm:grid-cols-3 sm:px-5">
             <div>
@@ -428,7 +439,7 @@ export default async function ArticlePage({
             </div>
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Published</div>
-              <div className="mt-1 text-sm text-[var(--foreground)]">{formatPublishedDate(externalStory.publishedAt)}</div>
+              <div className="mt-1 text-sm text-[var(--foreground)]">{formatPublishedDate(resolvedExternalStory.publishedAt)}</div>
             </div>
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Source</div>
@@ -438,7 +449,7 @@ export default async function ArticlePage({
           {imageSelection.isStrongMatch && imageSelection.imageUrl ? (
             <ConditionalNewsImage
               src={imageSelection.imageUrl}
-              alt={externalStory.featuredImageAlt ?? externalStory.title}
+              alt={resolvedExternalStory.featuredImageAlt ?? resolvedExternalStory.title}
               sizes="(max-width: 1024px) 100vw, 1040px"
               containerClassName="relative mt-7 h-[250px] overflow-hidden rounded-[28px] border border-black/6 bg-[var(--muted)] shadow-[0_18px_36px_rgba(15,23,42,0.08)] sm:h-[340px] lg:h-[430px] xl:max-w-[1040px]"
               imageClassName="object-cover object-center"
@@ -447,7 +458,7 @@ export default async function ArticlePage({
           <div className="mt-7 grid gap-7 xl:grid-cols-[minmax(0,1.56fr)_minmax(260px,0.5fr)] xl:gap-9">
             <div className="space-y-5">
               <p className="max-w-[860px] text-[1.02rem] leading-[1.95] text-[var(--muted-foreground)] sm:text-[1.08rem]">
-                {externalStory.summary}
+                {resolvedExternalStory.summary}
               </p>
               {showLeadSection ? (
                 <div className="rounded-[22px] border border-[var(--border)] bg-[var(--muted)]/38 px-5 py-4 sm:px-6">
@@ -460,7 +471,7 @@ export default async function ArticlePage({
                 </div>
               ) : null}
               <Button asChild className="h-11 px-5 bg-[#D8261D] shadow-[0_10px_24px_rgba(216,38,29,0.18)] hover:bg-[#bf1f18]">
-                <a href={externalStory.sourceUrl ?? "#"} target="_blank" rel="noreferrer">
+                <a href={resolvedExternalStory.sourceUrl ?? "#"} target="_blank" rel="noreferrer">
                   Continue reading at {publisherName}
                 </a>
               </Button>
@@ -478,15 +489,15 @@ export default async function ArticlePage({
                     </div>
                     <div className="border-b border-[var(--border)] pb-3.5">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Published</div>
-                      <div className="mt-1 text-sm leading-6 text-[var(--foreground)]">{new Date(externalStory.publishedAt).toLocaleString()}</div>
+                      <div className="mt-1 text-sm leading-6 text-[var(--foreground)]">{new Date(resolvedExternalStory.publishedAt).toLocaleString()}</div>
                     </div>
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Category</div>
-                      <div className="mt-1 text-sm text-[var(--foreground)]">{externalStory.category}</div>
+                      <div className="mt-1 text-sm text-[var(--foreground)]">{resolvedExternalStory.category}</div>
                     </div>
                   </div>
                   <Button asChild variant="outline" className="h-10 w-full justify-center border-[var(--border)] bg-white text-[13px] font-semibold">
-                    <a href={externalStory.sourceUrl ?? "#"} target="_blank" rel="noreferrer">
+                    <a href={resolvedExternalStory.sourceUrl ?? "#"} target="_blank" rel="noreferrer">
                       Visit publisher
                     </a>
                   </Button>
@@ -553,6 +564,10 @@ export default async function ArticlePage({
   }
 
   const articleRecord = article!;
+  console.info("Rendering public article image", {
+    slug: articleRecord.slug,
+    featuredImageUrl: articleRecord.featuredImageUrl,
+  });
 
   const [access, relatedArticles, moreFromCategory] = await (async () => {
     if (!databaseAvailable) {
@@ -663,16 +678,13 @@ export default async function ArticlePage({
       },
     ],
   };
-  const heroImage = articleRecord.featuredImageUrl
-    ? articleRecord.featuredImageUrl
-    : resolveNewsImageSelection({
-        slug: articleRecord.slug,
-        category: articleRecord.categories[0]?.category.name ?? articleRecord.articleType,
-        title: articleRecord.title,
-        summary: articleRecord.excerpt ?? "",
-        preferPremium: true,
-        minimumScore: 28,
-      }).imageUrl;
+  const heroImage = resolveArticleHeroImage({
+    slug: articleRecord.slug,
+    category: articleRecord.categories[0]?.category.name ?? articleRecord.articleType,
+    title: articleRecord.title,
+    summary: articleRecord.excerpt ?? "",
+    featuredImageUrl: articleRecord.featuredImageUrl,
+  });
   const relatedCandidates = [
     ...moreFromCategory.map((item) => ({
       id: item.id,

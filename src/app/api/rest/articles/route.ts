@@ -1,8 +1,20 @@
+import { revalidatePath } from "next/cache";
 import { ArticleStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { createArticle, formatArticleMutationError, listArticles } from "@/lib/articles";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleInputSchema } from "@/lib/validation";
+
+function revalidateArticlePaths(slug: string, categorySlugs: string[]) {
+  revalidatePath("/");
+  revalidatePath("/latest");
+  revalidatePath(`/articles/${slug}`);
+
+  for (const categorySlug of categorySlugs) {
+    revalidatePath(`/categories/${categorySlug}`);
+    revalidatePath(`/${categorySlug}`);
+  }
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -43,6 +55,8 @@ export async function POST(request: NextRequest) {
       },
       data: parsed.data,
     });
+
+    revalidateArticlePaths(article.slug, parsed.data.categorySlugs);
 
     return NextResponse.json({ data: article }, { status: 201 });
   } catch (error) {
