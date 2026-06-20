@@ -7,6 +7,7 @@ describe("browser mutation origin validation", () => {
     vi.restoreAllMocks();
     process.env.NEXTAUTH_URL = "http://127.0.0.1:3000";
     process.env.NEXT_PUBLIC_SITE_URL = "https://vanterenpress.vercel.app";
+    process.env.APP_URL = "https://vanterenpress.org";
   });
 
   it("allows configured localhost and production origins", () => {
@@ -14,7 +15,10 @@ describe("browser mutation origin validation", () => {
       expect.arrayContaining([
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://venterenpress.vercel.app",
         "https://vanterenpress.vercel.app",
+        "https://vanterenpress.org",
+        "https://www.vanterenpress.org",
       ]),
     );
   });
@@ -30,6 +34,26 @@ describe("browser mutation origin validation", () => {
 
     expect(isTrustedOrigin(request)).toBe(true);
     expect(validateBrowserMutation(request)).toEqual({ ok: true });
+  });
+
+  it("accepts the custom production domains", () => {
+    const apexRequest = new NextRequest("https://vanterenpress.org/api/rest/media/presign", {
+      method: "POST",
+      headers: {
+        origin: "https://vanterenpress.org",
+        host: "vanterenpress.org",
+      },
+    });
+    const wwwRequest = new NextRequest("https://www.vanterenpress.org/api/rest/media/presign", {
+      method: "POST",
+      headers: {
+        referer: "https://www.vanterenpress.org/admin/articles/article-1/edit",
+        host: "www.vanterenpress.org",
+      },
+    });
+
+    expect(validateBrowserMutation(apexRequest)).toEqual({ ok: true });
+    expect(validateBrowserMutation(wwwRequest)).toEqual({ ok: true });
   });
 
   it("rejects untrusted origins and logs the request details", () => {
@@ -50,6 +74,7 @@ describe("browser mutation origin validation", () => {
       "Rejected browser mutation due to invalid request origin",
       expect.objectContaining({
         origin: "https://evil.example",
+        referer: null,
         host: "vanterenpress.vercel.app",
         allowedOrigins: expect.arrayContaining(["https://vanterenpress.vercel.app"]),
       }),

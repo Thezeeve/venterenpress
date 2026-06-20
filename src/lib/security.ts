@@ -3,7 +3,10 @@ import { siteConfig } from "@/lib/site";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:3000",
+  "https://venterenpress.vercel.app",
   "https://vanterenpress.vercel.app",
+  "https://vanterenpress.org",
+  "https://www.vanterenpress.org",
 ];
 
 function normalizeOrigin(value: string | undefined) {
@@ -34,30 +37,33 @@ export function getAllowedOrigins() {
   );
 }
 
-function getRequestOrigin(request: NextRequest) {
+function getRequestOriginDetails(request: NextRequest) {
   const originHeader = request.headers.get("origin");
-  if (originHeader) {
-    return normalizeOrigin(originHeader);
-  }
-
   const refererHeader = request.headers.get("referer");
-  return normalizeOrigin(refererHeader ?? undefined);
+
+  return {
+    origin: normalizeOrigin(originHeader ?? undefined),
+    referer: normalizeOrigin(refererHeader ?? undefined),
+  };
 }
 
 export function isTrustedOrigin(request: NextRequest) {
-  const origin = getRequestOrigin(request);
-  if (!origin) {
+  const { origin, referer } = getRequestOriginDetails(request);
+  const comparableOrigin = origin ?? referer;
+  if (!comparableOrigin) {
     return true;
   }
 
-  return getAllowedOrigins().includes(origin);
+  return getAllowedOrigins().includes(comparableOrigin);
 }
 
 export function validateBrowserMutation(request: NextRequest) {
   if (!isTrustedOrigin(request)) {
     const allowedOrigins = getAllowedOrigins();
+    const { origin, referer } = getRequestOriginDetails(request);
     console.warn("Rejected browser mutation due to invalid request origin", {
-      origin: getRequestOrigin(request),
+      origin,
+      referer,
       host: request.headers.get("host"),
       allowedOrigins,
     });

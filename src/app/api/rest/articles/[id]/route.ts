@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { formatArticleMutationError, getArticleById, softDeleteArticle, updateArticle } from "@/lib/articles";
+import { validateBrowserMutation } from "@/lib/security";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleInputSchema } from "@/lib/validation";
 
@@ -33,6 +34,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const browserCheck = validateBrowserMutation(request);
+  if (!browserCheck.ok) {
+    return NextResponse.json({ error: browserCheck.error }, { status: 403 });
+  }
+
   const auth = await requireApiUser("articleEdit");
   if (!auth.ok) {
     return auth.response;
@@ -64,9 +70,14 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const browserCheck = validateBrowserMutation(request);
+  if (!browserCheck.ok) {
+    return NextResponse.json({ error: browserCheck.error }, { status: 403 });
+  }
+
   const auth = await requireApiUser("articleDelete");
   if (!auth.ok) {
     return auth.response;

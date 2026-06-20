@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { ArticleStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { createArticle, formatArticleMutationError, listArticles } from "@/lib/articles";
+import { validateBrowserMutation } from "@/lib/security";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleInputSchema } from "@/lib/validation";
 
@@ -32,6 +33,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const browserCheck = validateBrowserMutation(request);
+  if (!browserCheck.ok) {
+    return NextResponse.json({ error: browserCheck.error }, { status: 403 });
+  }
+
   const auth = await requireApiUser("articleCreate");
   if (!auth.ok) {
     return auth.response;

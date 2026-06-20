@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { autosaveArticle } from "@/lib/articles";
+import { validateBrowserMutation } from "@/lib/security";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleAutosaveSchema } from "@/lib/validation";
 
@@ -7,6 +8,11 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const browserCheck = validateBrowserMutation(request);
+  if (!browserCheck.ok) {
+    return NextResponse.json({ error: browserCheck.error }, { status: 403 });
+  }
+
   const auth = await requireApiUser("articleEdit");
   if (!auth.ok) {
     return auth.response;
