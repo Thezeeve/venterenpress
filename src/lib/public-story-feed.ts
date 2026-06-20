@@ -24,7 +24,7 @@ export type PublicNavItem = {
   href: string;
 };
 
-const PUBLIC_CATEGORY_CONFIG = {
+export const PUBLIC_CATEGORY_CONFIG = {
   world: { label: "World", href: "/world", section: "world" },
   business: { label: "Business", href: "/business", section: "business" },
   technology: { label: "Technology", href: "/technology", section: "technology" },
@@ -34,8 +34,9 @@ const PUBLIC_CATEGORY_CONFIG = {
   opinion: { label: "Opinion", href: "/opinion", section: "opinion" },
 } as const;
 
-const PUBLIC_TOPIC_CONFIG = {
-  politics: { label: "Politics", href: "/topics/politics" },
+export const PUBLIC_TOPIC_CONFIG = {
+  politics: { label: "Politics", href: "/politics" },
+  crypto: { label: "Crypto", href: "/crypto" },
 } as const;
 
 const PUBLIC_NAV_ORDER = [
@@ -43,10 +44,11 @@ const PUBLIC_NAV_ORDER = [
   { type: "topic", key: "politics" },
   { type: "category", key: "business" },
   { type: "category", key: "technology" },
+  { type: "topic", key: "crypto" },
+  { type: "category", key: "opinion" },
   { type: "category", key: "finance" },
   { type: "category", key: "sports" },
   { type: "category", key: "entertainment" },
-  { type: "category", key: "opinion" },
 ] as const;
 
 function normalizeExactLabel(value: string | null | undefined) {
@@ -369,7 +371,7 @@ export async function getVisiblePublicNavItems() {
   }
 
   try {
-    const [categories, financeCount, politicsCount] = await Promise.all([
+    const [categories, financeCount, politicsCount, cryptoCount] = await Promise.all([
       prisma.category.findMany({
         where: {
           OR: Object.values(PUBLIC_CATEGORY_CONFIG)
@@ -406,6 +408,16 @@ export async function getVisiblePublicNavItems() {
           ],
         },
       }),
+      prisma.article.count({
+        where: {
+          status: "PUBLISHED",
+          deletedAt: null,
+          OR: [
+            { categories: { some: { category: { name: PUBLIC_TOPIC_CONFIG.crypto.label } } } },
+            { tags: { some: { tag: { name: PUBLIC_TOPIC_CONFIG.crypto.label } } } },
+          ],
+        },
+      }),
     ]);
 
     const visibleCategoryNames = new Set(categories.map((item) => item.name));
@@ -422,6 +434,10 @@ export async function getVisiblePublicNavItems() {
 
       if (entry.key === "politics" && politicsCount > 0) {
         navItems.push(PUBLIC_TOPIC_CONFIG.politics);
+      }
+
+      if (entry.key === "crypto" && cryptoCount > 0) {
+        navItems.push(PUBLIC_TOPIC_CONFIG.crypto);
       }
     });
 

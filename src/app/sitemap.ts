@@ -1,75 +1,76 @@
 import { isDatabaseAvailable } from "@/lib/database-availability";
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
+import { PUBLIC_CATEGORY_CONFIG, PUBLIC_TOPIC_CONFIG } from "@/lib/public-story-feed";
+import { resolvePublicTaxonomyHref } from "@/lib/seo";
 import { siteConfig } from "@/lib/site";
+
+const publicSectionUrls = [
+  siteConfig.url,
+  ...Object.values(PUBLIC_CATEGORY_CONFIG).map((item) => `${siteConfig.url}${item.href}`),
+  ...Object.values(PUBLIC_TOPIC_CONFIG).map((item) => `${siteConfig.url}${item.href}`),
+];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!await isDatabaseAvailable()) {
-    return [
-      {
-        url: siteConfig.url,
-        lastModified: new Date(),
-        changeFrequency: "hourly",
-        priority: 1,
-      },
-      {
-        url: `${siteConfig.url}/search`,
-        lastModified: new Date(),
-        changeFrequency: "daily",
-        priority: 0.8,
-      },
-      {
-        url: `${siteConfig.url}/pricing`,
-        lastModified: new Date(),
-        changeFrequency: "weekly",
-        priority: 0.7,
-      },
-    ];
+    return publicSectionUrls.map((url, index) => ({
+      url,
+      lastModified: new Date(),
+      changeFrequency: index === 0 ? "hourly" : "daily",
+      priority: index === 0 ? 1 : 0.8,
+    }));
   }
 
-  const [articles, authors] = await Promise.all([
+  const [articles, categories] = await Promise.all([
     prisma.article.findMany({
       where: { status: "PUBLISHED", deletedAt: null },
       select: { slug: true, updatedAt: true },
-      take: 200,
+      orderBy: { updatedAt: "desc" },
     }).catch(() => []),
-    prisma.user.findMany({
-      where: { role: { in: ["JOURNALIST", "EDITOR_IN_CHIEF", "MANAGING_EDITOR"] } },
-      select: { id: true, updatedAt: true },
-      take: 100,
+    prisma.category.findMany({
+      where: {
+        articles: {
+          some: {
+            article: {
+              status: "PUBLISHED",
+              deletedAt: null,
+            },
+          },
+        },
+      },
+      select: { slug: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
     }).catch(() => []),
   ]);
 
+  const categoryUrls = new Map<string, Date>();
+  categories.forEach((category) => {
+    const path = resolvePublicTaxonomyHref(category.slug);
+    const url = `${siteConfig.url}${path}`;
+    const existing = categoryUrls.get(url);
+    if (!existing || existing < category.updatedAt) {
+      categoryUrls.set(url, category.updatedAt);
+    }
+  });
+
   return [
-    {
-      url: siteConfig.url,
+    ...publicSectionUrls.map((url, index) => ({
+      url,
       lastModified: new Date(),
-      changeFrequency: "hourly",
-      priority: 1,
-    },
-    {
-      url: `${siteConfig.url}/search`,
-      lastModified: new Date(),
-      changeFrequency: "daily",
-      priority: 0.8,
-    },
-    {
-      url: `${siteConfig.url}/pricing`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.7,
-    },
+      changeFrequency: index === 0 ? "hourly" as const : "daily" as const,
+      priority: index === 0 ? 1 : 0.8,
+    })),
+    ...[...categoryUrls.entries()].map(([url, lastModified]) => ({
+      url,
+      lastModified,
+      changeFrequency: "daily" as const,
+      priority: 0.75,
+    })),
     ...articles.map((article) => ({
       url: `${siteConfig.url}/articles/${article.slug}`,
       lastModified: article.updatedAt,
       changeFrequency: "daily" as const,
       priority: 0.9,
-    })),
-    ...authors.map((author) => ({
-      url: `${siteConfig.url}/authors/${author.id}`,
-      lastModified: author.updatedAt,
-      changeFrequency: "weekly" as const,
-      priority: 0.6,
     })),
   ];
 }

@@ -1,18 +1,18 @@
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL
+  ?? "https://vanterenpress.org";
+
 export const siteConfig = {
   name: process.env.SITE_NAME ?? "VANTERENPRESS",
   description:
     "An international newsroom delivering breaking news, markets, politics, technology, and live global coverage.",
-  url: process.env.APP_URL ?? "https://vanterenpress.com",
+  url: siteUrl.replace(/\/$/, ""),
   nav: [
     "World",
     "Politics",
     "Business",
     "Technology",
-    "Artificial Intelligence",
     "Crypto",
-    "Entertainment",
-    "Health",
-    "Sports",
     "Opinion",
   ],
   editions: [

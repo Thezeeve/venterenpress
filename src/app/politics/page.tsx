@@ -1,38 +1,38 @@
 import type { Metadata } from "next";
 import { PublicStoryListingPage } from "@/components/newsroom/public-story-listing-page";
-import { getSectionStories } from "@/lib/public-story-feed";
+import { getTopicStories } from "@/lib/public-story-feed";
 import { absoluteUrl, buildListingPageStructuredData, buildPageMetadata, getSectionSeoCopy } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-const seo = getSectionSeoCopy("technology");
+const seo = getSectionSeoCopy("politics");
 
 export const metadata: Metadata = buildPageMetadata({
   title: seo.title,
   description: seo.description,
-  path: "/technology",
+  path: "/politics",
 });
 
-export default async function TechnologyPage() {
-  const stories = await getSectionStories("technology");
+export default async function PoliticsPage() {
+  const stories = (await getTopicStories("politics")) ?? [];
 
   return (
     <PublicStoryListingPage
       badge="Section"
-      title="Technology"
-      description="AI, platforms, infrastructure, and the companies reshaping global technology markets."
+      title="Politics"
+      description="Government, elections, legislation, and power shifts shaping the public agenda."
       stories={stories}
       breadcrumbs={[
         { label: "Home", href: "/" },
-        { label: "Technology" },
+        { label: "Politics" },
       ]}
       structuredData={buildListingPageStructuredData({
         title: seo.title,
         description: seo.description,
-        url: absoluteUrl("/technology"),
+        url: absoluteUrl("/politics"),
         breadcrumbs: [
           { name: "Home", url: absoluteUrl("/") },
-          { name: "Technology", url: absoluteUrl("/technology") },
+          { name: "Politics", url: absoluteUrl("/politics") },
         ],
       })}
     />

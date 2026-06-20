@@ -3,8 +3,10 @@ import { Libre_Baskerville, Manrope } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
 import { AppShell } from "@/components/layout/app-shell";
+import { StructuredDataScript } from "@/components/seo/structured-data-script";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { getBrandConfig } from "@/lib/brand";
+import { buildWebsiteSchema } from "@/lib/seo";
 import { siteConfig } from "@/lib/site";
 
 const display = Libre_Baskerville({
@@ -23,7 +25,10 @@ export const dynamic = "force-dynamic";
 export function generateMetadata(): Metadata {
   return {
     metadataBase: new URL(siteConfig.url),
-    title: siteConfig.name,
+    title: {
+      default: siteConfig.name,
+      template: `%s | ${siteConfig.name}`,
+    },
     description: siteConfig.description,
     icons: {
       icon: [
@@ -41,6 +46,15 @@ export function generateMetadata(): Metadata {
       title: siteConfig.name,
       description: siteConfig.description,
       type: "website",
+      url: siteConfig.url,
+      siteName: siteConfig.name,
+      images: [{ url: `${siteConfig.url}/opengraph-image` }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: siteConfig.name,
+      description: siteConfig.description,
+      images: [`${siteConfig.url}/opengraph-image`],
     },
   };
 }
@@ -58,11 +72,11 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${display.variable} ${sans.variable} h-full antialiased`}
     >
-      
       <body
         className="min-h-full bg-[var(--background)] font-sans text-[var(--foreground)]"
         style={brandThemeStyle(brand.theme)}
       >
+        <StructuredDataScript data={buildWebsiteSchema()} />
         <AppProviders defaultTheme={brand.theme.mode}>
           <AppShell brand={brand}>{children}</AppShell>
         </AppProviders>

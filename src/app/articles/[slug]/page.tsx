@@ -10,6 +10,7 @@ import { ArticleBody } from "@/components/article/article-body";
 import { EditorialStoryCard } from "@/components/newsroom/editorial-story-card";
 import { ConditionalNewsImage } from "@/components/newsroom/conditional-news-image";
 import { TrendingNow } from "@/components/newsroom/trending-now";
+import { StructuredDataScript } from "@/components/seo/structured-data-script";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,9 +28,11 @@ import {
   type StoryRecommendationInput,
 } from "@/lib/article-experience";
 import { prisma } from "@/lib/prisma";
+import { absoluteUrl, buildArticleStructuredData, buildPageMetadata, resolvePublicTaxonomyHref } from "@/lib/seo";
 import { getCurrentUser } from "@/lib/server-auth";
 import { siteConfig } from "@/lib/site";
 import { canAccessArticle } from "@/lib/subscriptions";
+import { slugify } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +81,14 @@ function formatRelatedTimestamp(value: Date | string | null | undefined) {
 
 function getArticleDeskName(category: string | null | undefined, fallback: string) {
   return getNewsroomDeskLabel(category ?? fallback);
+}
+
+function getArticleCategoryPath(slugOrName: string | null | undefined) {
+  if (!slugOrName) {
+    return "/categories";
+  }
+
+  return resolvePublicTaxonomyHref(slugify(slugOrName));
 }
 
 function toPreviewRecommendationStory(story: NonNullable<Awaited<ReturnType<typeof getHomepageStoryBySlug>>>) {
@@ -251,7 +262,7 @@ export async function generateMetadata({
   const description = resolvedExternalStory
     ? resolvedExternalStory.seoDescription ?? resolvedExternalStory.summary ?? siteConfig.description
     : resolvedArticle!.seoDescription ?? resolvedArticle!.excerpt ?? siteConfig.description;
-  const canonicalUrl = `${siteConfig.url}/articles/${resolvedExternalStory?.slug ?? resolvedArticle!.slug}`;
+  const articlePath = `/articles/${resolvedExternalStory?.slug ?? resolvedArticle!.slug}`;
   const publishedTime = resolvedExternalStory ? resolvedExternalStory.publishedAt : resolvedArticle!.publishedAt?.toISOString();
   const modifiedTime = resolvedExternalStory
     ? resolvedExternalStory.publishedAt
@@ -260,32 +271,19 @@ export async function generateMetadata({
     ? resolvedExternalStory.category
     : resolvedArticle!.articleType;
   const sourceName = resolvedExternalStory ? formatPublisherName(resolvedExternalStory.sourceName) : siteConfig.name;
+  const image = resolvedExternalStory?.featuredImageUrl ?? resolvedArticle?.featuredImageUrl ?? null;
 
-  return {
+  return buildPageMetadata({
     title,
     description,
-    alternates: {
-      canonical: canonicalUrl,
-    },
-    openGraph: {
-      title,
-      description,
-      type: "article",
-      url: canonicalUrl,
-      images: [`${siteConfig.url}/opengraph-image`],
-      publishedTime,
-      modifiedTime,
-      section,
-      siteName: siteConfig.name,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      site: "@vanterenpress",
-    },
+    path: articlePath,
+    type: "article",
+    image,
+    publishedTime,
+    modifiedTime,
+    section,
     keywords: [siteConfig.name, section, sourceName],
-  };
+  });
 }
 
 export default async function ArticlePage({
@@ -357,6 +355,7 @@ export default async function ArticlePage({
   if (resolvedExternalStory) {
     const publisherName = formatPublisherName(resolvedExternalStory.sourceName);
     const deskLabel = getNewsroomDeskLabel(resolvedExternalStory.category);
+    const categoryPath = getArticleCategoryPath(resolvedExternalStory.category);
     const leadText = resolvedExternalStory.content[0] ?? resolvedExternalStory.summary;
     const showLeadSection = shouldShowLeadSection(resolvedExternalStory.summary, leadText);
     const imageSelection = resolveNewsImageSelection({
@@ -373,59 +372,36 @@ export default async function ArticlePage({
       3,
     );
     const usedRelatedImages: string[] = imageSelection.imageUrl ? [imageSelection.imageUrl] : [];
-    const previewStructuredData = {
-      "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": ["NewsArticle", "Article"],
-          headline: resolvedExternalStory.title,
-          description: resolvedExternalStory.summary,
-          datePublished: resolvedExternalStory.publishedAt,
-          articleSection: resolvedExternalStory.category,
-          author: {
-            "@type": "Organization",
-            name: getNewsroomDeskLabel(resolvedExternalStory.category),
-          },
-          publisher: {
-            "@type": "Organization",
-            name: siteConfig.name,
-            url: siteConfig.url,
-          },
-          isBasedOn: resolvedExternalStory.sourceUrl ?? undefined,
-          mainEntityOfPage: `${siteConfig.url}/articles/${resolvedExternalStory.slug}`,
-        },
-        {
-          "@type": "BreadcrumbList",
-          itemListElement: [
-            {
-              "@type": "ListItem",
-              position: 1,
-              name: "Home",
-              item: siteConfig.url,
-            },
-            {
-              "@type": "ListItem",
-              position: 2,
-              name: resolvedExternalStory.category,
-              item: `${siteConfig.url}/articles/${resolvedExternalStory.slug}`,
-            },
-            {
-              "@type": "ListItem",
-              position: 3,
-              name: resolvedExternalStory.title,
-              item: `${siteConfig.url}/articles/${resolvedExternalStory.slug}`,
-            },
-          ],
-        },
+    const previewStructuredData = buildArticleStructuredData({
+      title: resolvedExternalStory.title,
+      description: resolvedExternalStory.summary,
+      url: absoluteUrl(`/articles/${resolvedExternalStory.slug}`),
+      publishedTime: resolvedExternalStory.publishedAt,
+      modifiedTime: resolvedExternalStory.publishedAt,
+      section: resolvedExternalStory.category,
+      image: imageSelection.imageUrl,
+      authorName: publisherName,
+      breadcrumbs: [
+        { name: "Home", url: absoluteUrl("/") },
+        { name: resolvedExternalStory.category, url: absoluteUrl(categoryPath) },
+        { name: resolvedExternalStory.title, url: absoluteUrl(`/articles/${resolvedExternalStory.slug}`) },
       ],
-    };
+      isAccessibleForFree: true,
+    });
 
     return (
       <main className="mx-auto max-w-[1480px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(previewStructuredData) }} />
+        <StructuredDataScript data={previewStructuredData} />
         <article className="rounded-[32px] bg-white px-5 py-6 shadow-[0_18px_42px_rgba(15,23,42,0.05)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+          <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+            <Link href="/">Home</Link>
+            <span>/</span>
+            <Link href={categoryPath}>{resolvedExternalStory.category}</Link>
+            <span>/</span>
+            <span>{resolvedExternalStory.title}</span>
+          </nav>
           <div className="flex flex-wrap items-center gap-3">
-            <Badge>{resolvedExternalStory.category}</Badge>
+            <Badge><Link href={categoryPath}>{resolvedExternalStory.category}</Link></Badge>
             <Badge variant="neutral" className="px-2.5 py-1 text-[11px] tracking-[0.14em]">Syndicated report</Badge>
               <div className="text-sm text-[var(--muted-foreground)]">{new Date(resolvedExternalStory.publishedAt).toLocaleString()}</div>
           </div>
@@ -491,9 +467,13 @@ export default async function ArticlePage({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Published</div>
                       <div className="mt-1 text-sm leading-6 text-[var(--foreground)]">{new Date(resolvedExternalStory.publishedAt).toLocaleString()}</div>
                     </div>
-                    <div>
+                  <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Category</div>
-                      <div className="mt-1 text-sm text-[var(--foreground)]">{resolvedExternalStory.category}</div>
+                      <div className="mt-1 text-sm text-[var(--foreground)]">
+                        <Link href={categoryPath} className="underline underline-offset-4">
+                          {resolvedExternalStory.category}
+                        </Link>
+                      </div>
                     </div>
                   </div>
                   <Button asChild variant="outline" className="h-10 w-full justify-center border-[var(--border)] bg-white text-[13px] font-semibold">
@@ -632,58 +612,30 @@ export default async function ArticlePage({
     }).catch(() => null);
   }
 
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": ["NewsArticle", "Article"],
-        headline: articleRecord.title,
-        description: articleRecord.excerpt,
-        datePublished: articleRecord.publishedAt?.toISOString(),
-        dateModified: (articleRecord.updatedOn ?? articleRecord.updatedAt).toISOString(),
-        articleSection: articleRecord.categories[0]?.category.name ?? articleRecord.articleType,
-        author: {
-          "@type": "Organization",
-          name: getArticleDeskName(articleRecord.categories[0]?.category.name, articleRecord.articleType),
-        },
-        publisher: {
-          "@type": "Organization",
-          name: siteConfig.name,
-          url: siteConfig.url,
-        },
-        mainEntityOfPage: `${siteConfig.url}/articles/${articleRecord.slug}`,
-      },
-      {
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: "Home",
-            item: siteConfig.url,
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: articleRecord.categories[0]?.category.name ?? "Articles",
-            item: `${siteConfig.url}/articles/${articleRecord.slug}`,
-          },
-          {
-            "@type": "ListItem",
-            position: 3,
-            name: articleRecord.title,
-            item: `${siteConfig.url}/articles/${articleRecord.slug}`,
-          },
-        ],
-      },
-    ],
-  };
   const heroImage = resolveArticleHeroImage({
     slug: articleRecord.slug,
     category: articleRecord.categories[0]?.category.name ?? articleRecord.articleType,
     title: articleRecord.title,
     summary: articleRecord.excerpt ?? "",
     featuredImageUrl: articleRecord.featuredImageUrl,
+  });
+  const categoryName = articleRecord.categories[0]?.category.name ?? "Articles";
+  const categoryPath = getArticleCategoryPath(articleRecord.categories[0]?.category.slug ?? categoryName);
+  const structuredData = buildArticleStructuredData({
+    title: articleRecord.title,
+    description: articleRecord.excerpt ?? siteConfig.description,
+    url: absoluteUrl(`/articles/${articleRecord.slug}`),
+    publishedTime: articleRecord.publishedAt?.toISOString(),
+    modifiedTime: (articleRecord.updatedOn ?? articleRecord.updatedAt).toISOString(),
+    section: categoryName,
+    image: heroImage,
+    authorName: articleRecord.author?.name ?? getArticleDeskName(categoryName, articleRecord.articleType),
+    breadcrumbs: [
+      { name: "Home", url: absoluteUrl("/") },
+      { name: categoryName, url: absoluteUrl(categoryPath) },
+      { name: articleRecord.title, url: absoluteUrl(`/articles/${articleRecord.slug}`) },
+    ],
+    isAccessibleForFree: articleRecord.accessTier === "FREE",
   });
   const relatedCandidates = [
     ...moreFromCategory.map((item) => ({
@@ -721,11 +673,18 @@ export default async function ArticlePage({
 
   return (
     <main className="mx-auto max-w-[1480px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      <StructuredDataScript data={structuredData} />
       <div className="grid gap-7 xl:grid-cols-[minmax(0,1.56fr)_minmax(280px,0.48fr)] xl:gap-10">
         <article>
+          <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+            <Link href="/">Home</Link>
+            <span>/</span>
+            <Link href={categoryPath}>{categoryName}</Link>
+            <span>/</span>
+            <span>{articleRecord.title}</span>
+          </nav>
           <div className="flex flex-wrap items-center gap-2.5">
-            <Badge>{articleRecord.categories[0]?.category.name ?? articleRecord.articleType}</Badge>
+            <Badge><Link href={categoryPath}>{categoryName}</Link></Badge>
             {articleRecord.accessTier !== "FREE" ? (
               <Badge variant="neutral" className="px-2.5 py-1 text-[11px] tracking-[0.14em]"><Crown className="mr-1 h-3.5 w-3.5" /> Premium</Badge>
             ) : null}
