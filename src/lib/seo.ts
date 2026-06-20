@@ -155,6 +155,10 @@ export function buildArticleStructuredData(input: {
   breadcrumbs: BreadcrumbItem[];
   isAccessibleForFree?: boolean;
 }) {
+  const image = input.image
+    ? (input.image.startsWith("http") ? input.image : absoluteUrl(input.image))
+    : undefined;
+
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -167,7 +171,7 @@ export function buildArticleStructuredData(input: {
         datePublished: input.publishedTime,
         dateModified: input.modifiedTime ?? input.publishedTime,
         articleSection: input.section,
-        image: input.image ? [input.image] : undefined,
+        image: image ? [image] : undefined,
         isAccessibleForFree: input.isAccessibleForFree,
         author: {
           "@type": "Person",

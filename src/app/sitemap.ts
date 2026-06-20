@@ -10,6 +10,7 @@ const publicSectionUrls = [
   ...Object.values(PUBLIC_CATEGORY_CONFIG).map((item) => `${siteConfig.url}${item.href}`),
   ...Object.values(PUBLIC_TOPIC_CONFIG).map((item) => `${siteConfig.url}${item.href}`),
 ];
+const publicSectionUrlSet = new Set(publicSectionUrls);
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!await isDatabaseAvailable()) {
@@ -47,6 +48,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   categories.forEach((category) => {
     const path = resolvePublicTaxonomyHref(category.slug);
     const url = `${siteConfig.url}${path}`;
+    if (publicSectionUrlSet.has(url)) {
+      return;
+    }
     const existing = categoryUrls.get(url);
     if (!existing || existing < category.updatedAt) {
       categoryUrls.set(url, category.updatedAt);
