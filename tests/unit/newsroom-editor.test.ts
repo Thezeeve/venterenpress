@@ -166,6 +166,8 @@ describe("NewsroomEditor upload support", () => {
     await user.type(screen.getByPlaceholderText("Categories, comma separated"), "technology");
     await user.click(screen.getByRole("button", { name: "Save Draft" }));
 
+    expect(await screen.findByText("Draft saved successfully.")).toBeVisible();
+
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/rest/articles",
@@ -179,6 +181,93 @@ describe("NewsroomEditor upload support", () => {
     const requestBody = JSON.parse((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string);
     expect(requestBody.featuredImageUrl).toBe("https://cdn.example.com/images/article.png");
   }, 15000);
+
+  it("shows a publishing loading state and success feedback", async () => {
+    const user = userEvent.setup();
+    let resolvePublish: ((value: { ok: boolean; json: () => Promise<{ data: { id: string; slug: string } }> }) => void) | null = null;
+    const publishPromise = new Promise<{ ok: boolean; json: () => Promise<{ data: { id: string; slug: string } }> }>((resolve) => {
+      resolvePublish = resolve;
+    });
+    const fetchMock = vi.fn().mockReturnValue(publishPromise);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    await user.type(screen.getByPlaceholderText("Article headline"), "Global chip alliances reshape AI infrastructure competition");
+    await user.type(screen.getByPlaceholderText("Slug"), "global-chip-alliances");
+    await user.type(
+      screen.getByPlaceholderText("Excerpt"),
+      "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+    );
+    await user.type(screen.getByPlaceholderText("Categories, comma separated"), "technology");
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(screen.getByRole("button", { name: "Publishing..." })).toBeDisabled();
+
+    resolvePublish?.({
+      ok: true,
+      json: async () => ({ data: { id: "article-7", slug: "global-chip-alliances" } }),
+    });
+
+    expect(await screen.findByText("Article published successfully.")).toBeVisible();
+    expect(screen.getByRole("link", { name: "View published article" })).toHaveAttribute("href", "/articles/global-chip-alliances");
+  });
+
+  it("shows publish failure details from the API", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: "Slug already exists." }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    await user.type(screen.getByPlaceholderText("Article headline"), "Global chip alliances reshape AI infrastructure competition");
+    await user.type(screen.getByPlaceholderText("Slug"), "global-chip-alliances");
+    await user.type(
+      screen.getByPlaceholderText("Excerpt"),
+      "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+    );
+    await user.type(screen.getByPlaceholderText("Categories, comma separated"), "technology");
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByText("Publishing failed. Slug already exists.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+  });
+
+  it("shows visible validation issues when publish is blocked", async () => {
+    const user = userEvent.setup();
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByText("Publishing failed.")).toBeVisible();
+    expect(screen.getByText("Title required.")).toBeVisible();
+    expect(screen.getByText("Slug required.")).toBeVisible();
+    expect(screen.getByText("Summary required.")).toBeVisible();
+    expect(screen.getByText("Category required.")).toBeVisible();
+  });
 
   it("keeps manual image url fallback working", async () => {
     const fetchMock = vi.fn().mockResolvedValue({

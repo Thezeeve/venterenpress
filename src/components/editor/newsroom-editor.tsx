@@ -21,6 +21,7 @@ import {
   buildArticlePayload,
   extractApiErrorMessage,
   htmlToArticleBody,
+  validateEditorIssues,
   validateEditorValues,
   validateArticleImageFile,
 } from "@/lib/article-editor";
@@ -83,6 +84,7 @@ export function NewsroomEditor({
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "publishing">("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [validationIssues, setValidationIssues] = useState<string[]>([]);
   const [currentArticleId, setCurrentArticleId] = useState(articleId ?? initialArticle?.id ?? "");
   const [publicArticleHref, setPublicArticleHref] = useState(
     initialArticle?.slug && initialArticle?.status === "PUBLISHED" ? `/articles/${initialArticle.slug}` : "",
@@ -113,8 +115,16 @@ export function NewsroomEditor({
   const previewMarkup = useMemo(() => editor?.getHTML() ?? "", [editor]);
   const previewBody = useMemo(() => htmlToArticleBody(previewMarkup), [previewMarkup]);
 
+  function logSubmitDebug(label: string, payload: unknown) {
+    if (process.env.NODE_ENV !== "development") {
+      return;
+    }
+
+    console.info(label, payload);
+  }
+
   useEffect(() => {
-    if (!currentArticleId || !editor) {
+    if (!currentArticleId || !editor || submitState !== "idle") {
       return;
     }
 
@@ -134,7 +144,7 @@ export function NewsroomEditor({
     }, 1500);
 
     return () => window.clearTimeout(timeout);
-  }, [currentArticleId, editor, excerpt, previewMarkup, title]);
+  }, [currentArticleId, editor, excerpt, previewMarkup, submitState, title]);
 
   useEffect(() => {
     return () => {
@@ -337,34 +347,44 @@ export function NewsroomEditor({
 
     setErrorMessage("");
     setSuccessMessage("");
+    setValidationIssues([]);
+
+    const editorValues = {
+      title,
+      slug,
+      excerpt,
+      categories,
+      tags,
+      editionCode,
+      seoTitle,
+      seoDescription,
+      featuredImageUrl,
+      featuredImageAlt,
+    };
+    const issues = validateEditorIssues(editorValues, editor.getHTML());
 
     const validationError = validateEditorValues(
-      {
-        title,
-        slug,
-        excerpt,
-        categories,
-        tags,
-        editionCode,
-        seoTitle,
-        seoDescription,
-        featuredImageUrl,
-        featuredImageAlt,
-      },
+      editorValues,
       editor.getHTML(),
     );
 
     if (validationError) {
-      setErrorMessage(validationError);
+      logSubmitDebug("Article validation blocked submit", {
+        intent,
+        issues,
+      });
+      setErrorMessage(intent === "publish" ? "Publishing failed." : "Draft save failed.");
+      setValidationIssues(issues);
       return;
     }
 
     if (intent === "publish" && !canPublish) {
-      setErrorMessage("Your role does not have permission to publish articles.");
+      setErrorMessage("Publishing failed. Your role does not have permission to publish articles.");
       return;
     }
 
     setSubmitState(intent === "publish" ? "publishing" : "saving");
+    setAutosaveStatus(intent === "publish" ? "Publishing..." : "Saving draft...");
 
     try {
       const payload = buildArticlePayload(
@@ -383,10 +403,11 @@ export function NewsroomEditor({
         editor.getHTML(),
         intent,
       );
-      console.info("Submitting article payload", {
+      logSubmitDebug("Submitting article payload", {
         articleId: currentArticleId || null,
         intent,
         featuredImageUrl: payload.featuredImageUrl,
+        payload,
       });
 
       const method = currentArticleId ? "PATCH" : "POST";
@@ -398,9 +419,21 @@ export function NewsroomEditor({
       });
 
       const responseBody = (await response.json().catch(() => null)) as { data?: { id: string; slug: string } } | null;
+      logSubmitDebug("Article submit response", {
+        articleId: currentArticleId || null,
+        intent,
+        status: response.status,
+        ok: response.ok,
+        body: responseBody,
+      });
       if (!response.ok) {
-        setErrorMessage(extractApiErrorMessage(responseBody, "Unable to save article."));
+        const reason = extractApiErrorMessage(
+          responseBody,
+          intent === "publish" ? "Unable to publish article." : "Unable to save draft.",
+        );
+        setErrorMessage(`${intent === "publish" ? "Publishing failed" : "Draft save failed"}. ${reason}`);
         setSubmitState("idle");
+        setAutosaveStatus(intent === "publish" ? "Publish failed" : "Draft save failed");
         return;
       }
 
@@ -416,14 +449,24 @@ export function NewsroomEditor({
           ? "Article published successfully."
           : "Draft saved successfully.",
       );
-      setAutosaveStatus("Saved just now");
+      setAutosaveStatus(intent === "publish" ? "Published just now" : "Draft saved just now");
       setSubmitState("idle");
       if (nextArticleId) {
         setCurrentArticleId(nextArticleId);
       }
-    } catch {
-      setErrorMessage("Unable to save article.");
+    } catch (error) {
+      logSubmitDebug("Article submit request failed", {
+        articleId: currentArticleId || null,
+        intent,
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+      });
+      setErrorMessage(
+        `${intent === "publish" ? "Publishing failed" : "Draft save failed"}. ${
+          error instanceof Error ? error.message : "Unable to save article."
+        }`,
+      );
       setSubmitState("idle");
+      setAutosaveStatus(intent === "publish" ? "Publish failed" : "Draft save failed");
     }
   }
 
@@ -432,7 +475,12 @@ export function NewsroomEditor({
       <div className="space-y-6">
         {errorMessage ? (
           <div className="rounded-[22px] border border-[#D8261D]/20 bg-[#D8261D]/8 px-4 py-3 text-sm text-[#8A1C16]">
-            {errorMessage}
+            <p>{errorMessage}</p>
+            {validationIssues.length ? (
+              <ul className="mt-2 list-disc pl-5">
+                {validationIssues.map((issue) => <li key={issue}>{issue}</li>)}
+              </ul>
+            ) : null}
           </div>
         ) : null}
 
@@ -716,7 +764,7 @@ export function NewsroomEditor({
                 onClick={() => void submitArticle("draft")}
                 disabled={submitState !== "idle"}
               >
-                <Save className="h-4 w-4" />
+                {submitState === "saving" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {submitState === "saving" ? "Saving..." : "Save Draft"}
               </Button>
               <Button
@@ -724,7 +772,7 @@ export function NewsroomEditor({
                 onClick={() => void submitArticle("publish")}
                 disabled={submitState !== "idle" || !canPublish}
               >
-                <SendHorizontal className="h-4 w-4" />
+                {submitState === "publishing" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
                 {submitState === "publishing" ? "Publishing..." : "Publish"}
               </Button>
             </div>

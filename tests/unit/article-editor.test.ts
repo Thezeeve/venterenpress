@@ -4,6 +4,7 @@ import {
   articleBodyToEditorHtml,
   buildArticlePayload,
   htmlToArticleBody,
+  validateEditorIssues,
   validateArticleImageFile,
   validateEditorValues,
 } from "@/lib/article-editor";
@@ -102,5 +103,26 @@ describe("article editor helpers", () => {
 
     expect(validateArticleImageFile(allowedFile)).toBeNull();
     expect(validateArticleImageFile(oversizedFile)).toBe("Image must be 10MB or smaller.");
+  });
+
+  it("returns a visible validation issue list for blocked publish actions", () => {
+    expect(validateEditorIssues({
+      title: "",
+      slug: "",
+      excerpt: "",
+      categories: "",
+      tags: "",
+      editionCode: "AFRICA",
+      seoTitle: "",
+      seoDescription: "",
+      featuredImageUrl: "",
+      featuredImageAlt: "",
+    }, "<p></p>")).toEqual([
+      "Title required.",
+      "Slug required.",
+      "Summary required.",
+      "Category required.",
+      "Body required.",
+    ]);
   });
 });

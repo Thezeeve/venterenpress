@@ -192,27 +192,40 @@ export function htmlToArticleBody(html: string) {
 }
 
 export function validateEditorValues(values: EditorFormValues, bodyHtml: string) {
-  if (values.title.trim().length < 10) {
-    return "Title must be at least 10 characters.";
+  const issues = validateEditorIssues(values, bodyHtml);
+  return issues[0] ?? null;
+}
+
+export function validateEditorIssues(values: EditorFormValues, bodyHtml: string) {
+  const issues: string[] = [];
+
+  if (!values.title.trim()) {
+    issues.push("Title required.");
+  } else if (values.title.trim().length < 10) {
+    issues.push("Title must be at least 10 characters.");
   }
 
-  if ((values.slug.trim() || slugify(values.title)).length < 3) {
-    return "Slug must be at least 3 characters.";
+  if (!values.slug.trim()) {
+    issues.push("Slug required.");
+  } else if (values.slug.trim().length < 3) {
+    issues.push("Slug must be at least 3 characters.");
   }
 
-  if (values.excerpt.trim().length < 20) {
-    return "Excerpt must be at least 20 characters.";
+  if (!values.excerpt.trim()) {
+    issues.push("Summary required.");
+  } else if (values.excerpt.trim().length < 20) {
+    issues.push("Excerpt must be at least 20 characters.");
   }
 
   if (!splitCommaSeparated(values.categories).length) {
-    return "Choose at least one category.";
+    issues.push("Category required.");
   }
 
   if (!bodyHtml.replace(/<[^>]+>/g, "").trim()) {
-    return "Body cannot be empty.";
+    issues.push("Body required.");
   }
 
-  return null;
+  return issues;
 }
 
 export function buildArticlePayload(values: EditorFormValues, bodyHtml: string, intent: EditorSubmitIntent) {
