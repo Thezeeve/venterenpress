@@ -1,4 +1,5 @@
 import { isDatabaseAvailable } from "@/lib/database-availability";
+import { HOMEPAGE_HERO_ARTICLE_KEY, applyHomepageHeroSelection, toEditorialStoryFromArticle } from "@/lib/homepage-hero";
 import { prisma } from "@/lib/prisma";
 import { CurrentsNewsProvider } from "@/lib/news-providers/currents-provider";
 import { FinanceNewsProvider } from "@/lib/news-providers/finance-provider";
@@ -129,6 +130,88 @@ function normalizeHomepageBundle(bundle: HomepageNewsBundle): HomepageNewsBundle
     opinion: bundle.opinion.map((story) => normalizeLiveStory(story)),
     mostRead: bundle.mostRead.map((story) => normalizeLiveStory(story)),
   };
+}
+
+function isCmsStoryVisible(story: EditorialStory, visibleCmsStoryIds: Set<string>) {
+  return story.provider !== "cms" || visibleCmsStoryIds.has(story.id);
+}
+
+function filterHomepageBundleToVisibleStories(bundle: HomepageNewsBundle, visibleCmsStoryIds: Set<string>) {
+  const nextHeroStory = isCmsStoryVisible(bundle.heroStory, visibleCmsStoryIds)
+    ? bundle.heroStory
+    : null;
+  const firstVisibleStory = [
+    ...bundle.topStories,
+    ...bundle.worldNews,
+    ...bundle.businessNews,
+    ...bundle.technologyNews,
+    ...bundle.sportsNews,
+    ...bundle.liveCoverage,
+    ...bundle.opinion,
+    ...bundle.mostRead,
+  ].find((story) => isCmsStoryVisible(story, visibleCmsStoryIds));
+
+  return {
+    ...bundle,
+    heroStory: nextHeroStory ?? firstVisibleStory ?? bundle.heroStory,
+    topStories: bundle.topStories.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
+    worldNews: bundle.worldNews.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
+    businessNews: bundle.businessNews.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
+    technologyNews: bundle.technologyNews.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
+    sportsNews: bundle.sportsNews.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
+    liveCoverage: bundle.liveCoverage.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
+    opinion: bundle.opinion.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
+    mostRead: bundle.mostRead.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
+    latestSidebar: bundle.latestSidebar,
+  } satisfies HomepageNewsBundle;
+}
+
+async function getHomepageHeroOverrides() {
+  if (!await isDatabaseAvailable()) {
+    return { manualHero: null, fallbackHero: null, visibleCmsStoryIds: new Set<string>() };
+  }
+
+  const articleInclude = {
+    author: { select: { name: true, email: true } },
+    edition: { select: { name: true, region: true } },
+    categories: { include: { category: { select: { name: true } } } },
+    tags: { include: { tag: { select: { name: true } } } },
+  } as const;
+
+  try {
+    const setting = await prisma.siteSetting.findUnique({
+      where: { key: HOMEPAGE_HERO_ARTICLE_KEY },
+    });
+    const manualHeroArticleId = setting?.value && typeof setting.value === "object" && "articleId" in setting.value && typeof setting.value.articleId === "string"
+      ? setting.value.articleId
+      : null;
+
+    const [manualHeroArticle, fallbackHeroArticle, visibleCmsArticles] = await Promise.all([
+      manualHeroArticleId
+        ? prisma.article.findFirst({
+            where: { id: manualHeroArticleId, status: "PUBLISHED", deletedAt: null },
+            include: articleInclude,
+          })
+        : Promise.resolve(null),
+      prisma.article.findFirst({
+        where: { status: "PUBLISHED", deletedAt: null },
+        include: articleInclude,
+        orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+      }),
+      prisma.article.findMany({
+        where: { status: "PUBLISHED", deletedAt: null },
+        select: { id: true },
+      }),
+    ]);
+
+    return {
+      manualHero: manualHeroArticle ? toEditorialStoryFromArticle(manualHeroArticle) : null,
+      fallbackHero: fallbackHeroArticle ? toEditorialStoryFromArticle(fallbackHeroArticle) : null,
+      visibleCmsStoryIds: new Set(visibleCmsArticles.map((article) => article.id)),
+    };
+  } catch {
+    return { manualHero: null, fallbackHero: null, visibleCmsStoryIds: new Set<string>() };
+  }
 }
 
 function getSeedLatestFallbackStories() {
@@ -546,25 +629,48 @@ export function ensureHomepageNewsRefreshScheduler() {
 
 export async function getHomepageNewsResponse(): Promise<HomepageNewsApiResponse> {
   try {
+    const heroOverrides = await getHomepageHeroOverrides();
     const mode = getNewsMode();
     if (mode === "seed") {
       const seedResponse = buildSeedResponse();
       schedulerGlobal.__homepageNewsLastResponse = seedResponse;
-      return seedResponse;
+      return {
+        ...seedResponse,
+        bundle: applyHomepageHeroSelection(
+          filterHomepageBundleToVisibleStories(seedResponse.bundle, heroOverrides.visibleCmsStoryIds),
+          heroOverrides.manualHero,
+          heroOverrides.fallbackHero,
+        ),
+      };
     }
 
     ensureHomepageNewsRefreshScheduler();
 
     const persisted = (await readPersistedHomepageNews()) ?? schedulerGlobal.__homepageNewsLastResponse ?? null;
     if (!persisted) {
-      return refreshHomepageNews("initial-request");
+      const fresh = await refreshHomepageNews("initial-request");
+      return {
+        ...fresh,
+        bundle: applyHomepageHeroSelection(
+          filterHomepageBundleToVisibleStories(fresh.bundle, heroOverrides.visibleCmsStoryIds),
+          heroOverrides.manualHero,
+          heroOverrides.fallbackHero,
+        ),
+      };
     }
 
     if (isRefreshDue(persisted)) {
       void refreshHomepageNews("request-due");
     }
 
-    return persisted;
+    return {
+      ...persisted,
+      bundle: applyHomepageHeroSelection(
+        filterHomepageBundleToVisibleStories(persisted.bundle, heroOverrides.visibleCmsStoryIds),
+        heroOverrides.manualHero,
+        heroOverrides.fallbackHero,
+      ),
+    };
   } catch (error) {
     console.error("[news-refresh] failed to load homepage response", error);
     return schedulerGlobal.__homepageNewsLastResponse ?? buildSeedResponse();

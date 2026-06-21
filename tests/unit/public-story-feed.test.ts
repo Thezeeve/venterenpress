@@ -10,6 +10,8 @@ vi.mock("@/lib/news-providers", () => ({
 import {
   dedupePublicStoriesById,
   dedupePublicStoryImages,
+  filterRenderableNewsroomArticles,
+  filterRenderablePublicStories,
   getCategoryStories,
   getSectionStories,
   getTopicStories,
@@ -92,11 +94,31 @@ describe("public story feed integrity", () => {
   it("deduplicates repeated stories by article id before rendering", () => {
     const stories = dedupePublicStoriesById([
       { id: "article-1", slug: "alpha" },
-      { id: "article-1", slug: "alpha-updated" },
-      { id: "article-2", slug: "beta" },
+      { id: "article-2", slug: "alpha" },
+      { id: "article-3", slug: "beta" },
     ]);
 
     expect(stories).toHaveLength(2);
-    expect(stories.map((story) => story.id)).toEqual(["article-1", "article-2"]);
+    expect(stories.map((story) => story.id)).toEqual(["article-1", "article-3"]);
+  });
+
+  it("filters soft-deleted public stories before rendering cards", () => {
+    const stories = filterRenderablePublicStories([
+      { id: "article-1", slug: "visible", href: "/articles/visible", title: "Visible", excerpt: null, category: "World", publishedAt: null, imageUrl: null, imageAlt: null, deletedAt: null, status: "PUBLISHED" },
+      { id: "article-2", slug: "deleted", href: "/articles/deleted", title: "Deleted", excerpt: null, category: "World", publishedAt: null, imageUrl: null, imageAlt: null, deletedAt: new Date(), status: "PUBLISHED" },
+    ]);
+
+    expect(stories).toHaveLength(1);
+    expect(stories[0]?.slug).toBe("visible");
+  });
+
+  it("filters soft-deleted newsroom articles before rendering discovery links", () => {
+    const articles = filterRenderableNewsroomArticles([
+      { id: "article-1", slug: "visible", deletedAt: null, status: "PUBLISHED" },
+      { id: "article-2", slug: "deleted", deletedAt: new Date(), status: "PUBLISHED" },
+    ]);
+
+    expect(articles).toHaveLength(1);
+    expect(articles[0]?.slug).toBe("visible");
   });
 });

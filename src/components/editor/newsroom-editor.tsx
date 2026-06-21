@@ -10,6 +10,7 @@ import LinkExtension from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
 import { ArticleBody } from "@/components/article/article-body";
+import { HomepageHeroButton } from "@/components/editor/homepage-hero-button";
 import { ConditionalNewsImage } from "@/components/newsroom/conditional-news-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +54,7 @@ type EditorInitialArticle = {
   tagSlugs?: string[];
   featuredImageUrl?: string | null;
   featuredImageAlt?: string | null;
+  isHomepageHero?: boolean;
 };
 
 export function NewsroomEditor({
@@ -818,6 +820,13 @@ export function NewsroomEditor({
                 {submitState === "publishing" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
                 {submitState === "publishing" ? "Publishing..." : "Publish"}
               </Button>
+              {currentArticleId ? (
+                <HomepageHeroButton
+                  articleId={currentArticleId}
+                  isHomepageHero={Boolean(initialArticle?.isHomepageHero && currentStatus === "PUBLISHED")}
+                  disabled={currentStatus !== "PUBLISHED"}
+                />
+              ) : null}
               {currentArticleId && canDelete ? (
                 <Button
                   type="button"

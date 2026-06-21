@@ -3,7 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { StructuredDataScript } from "@/components/seo/structured-data-script";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PublicStoryCard } from "@/components/newsroom/public-story-card";
-import { dedupePublicStoriesById, dedupePublicStoryImages, formatPublicStoryDate, type PublicStoryFeedItem } from "@/lib/public-story-feed";
+import {
+  dedupePublicStoriesById,
+  dedupePublicStoryImages,
+  filterRenderablePublicStories,
+  formatPublicStoryDate,
+  type PublicStoryFeedItem,
+} from "@/lib/public-story-feed";
 
 export function PublicStoryListingPage({
   badge,
@@ -22,7 +28,7 @@ export function PublicStoryListingPage({
   breadcrumbs?: { label: string; href?: string }[];
   structuredData?: Record<string, unknown>;
 }) {
-  const dedupedStories = dedupePublicStoryImages(dedupePublicStoriesById(stories));
+  const dedupedStories = dedupePublicStoryImages(dedupePublicStoriesById(filterRenderablePublicStories(stories)));
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-16">

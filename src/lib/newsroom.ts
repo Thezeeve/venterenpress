@@ -6,6 +6,8 @@ export type NewsroomArticleCard = {
   slug: string;
   title: string;
   excerpt: string | null;
+  status?: string | null;
+  deletedAt?: Date | null;
   featuredImageUrl?: string | null;
   featuredImageAlt?: string | null;
   articleType: string;

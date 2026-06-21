@@ -5,6 +5,7 @@ import {
   WorkflowDecision,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { HOMEPAGE_HERO_ARTICLE_KEY } from "@/lib/homepage-hero";
 import { slugify } from "@/lib/utils";
 import { writeAuditLog } from "@/lib/audit";
 import { enqueueScheduledPublish, enqueueSearchIndex } from "@/lib/jobs/queues";
@@ -97,6 +98,19 @@ async function connectTags(tagSlugs: string[]) {
   );
 
   return tags;
+}
+
+async function clearHomepageHeroIfMatches(articleId: string) {
+  const currentHeroArticleId = await getHomepageHeroArticleId();
+  if (currentHeroArticleId !== articleId) {
+    return;
+  }
+
+  await prisma.siteSetting.upsert({
+    where: { key: HOMEPAGE_HERO_ARTICLE_KEY },
+    update: { value: { articleId: null } },
+    create: { key: HOMEPAGE_HERO_ARTICLE_KEY, value: { articleId: null } },
+  });
 }
 
 export async function createArticle(input: {
@@ -293,6 +307,10 @@ export async function updateArticle(input: {
 
   if (updated.status === ArticleStatus.SCHEDULED && updated.scheduledFor) {
     await enqueueScheduledPublish(updated.id, updated.scheduledFor);
+  }
+
+  if (updated.status !== ArticleStatus.PUBLISHED || updated.deletedAt) {
+    await clearHomepageHeroIfMatches(updated.id);
   }
 
   await enqueueSearchIndex("article", updated.id);
@@ -503,6 +521,10 @@ export async function transitionArticleWorkflow(input: {
     await enqueueScheduledPublish(updated.id, updated.scheduledFor);
   }
 
+  if (updated.status !== ArticleStatus.PUBLISHED || updated.deletedAt) {
+    await clearHomepageHeroIfMatches(updated.id);
+  }
+
   await enqueueSearchIndex("article", updated.id);
   await writeAuditLog({
     userId: input.actor.id,
@@ -537,10 +559,62 @@ export async function softDeleteArticle(input: {
     },
   }).catch(() => null);
 
+  await clearHomepageHeroIfMatches(input.articleId);
+
   await writeAuditLog({
     userId: input.actor.id,
     action: "article.delete",
     resource: input.articleId,
+  });
+
+  return article;
+}
+
+export async function getHomepageHeroArticleId() {
+  const setting = await prisma.siteSetting.findUnique({
+    where: { key: HOMEPAGE_HERO_ARTICLE_KEY },
+  });
+
+  if (!setting?.value || typeof setting.value !== "object" || !("articleId" in setting.value)) {
+    return null;
+  }
+
+  const articleId = setting.value.articleId;
+  return typeof articleId === "string" && articleId.length ? articleId : null;
+}
+
+export async function setHomepageHeroArticle(input: {
+  actor: { id: string; role: Role };
+  articleId: string;
+}) {
+  const article = await prisma.article.findUnique({
+    where: { id: input.articleId },
+    include: articleInclude,
+  });
+
+  if (!article) {
+    throw new Error("Article not found");
+  }
+
+  if (article.deletedAt || article.status !== ArticleStatus.PUBLISHED) {
+    throw new Error("Only published, non-deleted articles can be set as the homepage hero.");
+  }
+
+  await prisma.siteSetting.upsert({
+    where: { key: HOMEPAGE_HERO_ARTICLE_KEY },
+    update: {
+      value: { articleId: article.id },
+    },
+    create: {
+      key: HOMEPAGE_HERO_ARTICLE_KEY,
+      value: { articleId: article.id },
+    },
+  });
+
+  await writeAuditLog({
+    userId: input.actor.id,
+    action: "article.setHomepageHero",
+    resource: article.id,
   });
 
   return article;

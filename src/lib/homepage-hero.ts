@@ -1,0 +1,109 @@
+import type { Prisma } from "@prisma/client";
+import type { EditorialStory, HomepageNewsBundle } from "@/lib/news-providers/types";
+import { siteConfig } from "@/lib/site";
+
+export const HOMEPAGE_HERO_ARTICLE_KEY = "homepage.heroArticleId";
+
+type HomepageHeroArticle = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  body: Prisma.JsonValue;
+  featuredImageUrl: string | null;
+  featuredImageAlt: string | null;
+  publishedAt: Date | null;
+  updatedAt: Date;
+  readingTimeMinutes: number;
+  articleType: string;
+  author: {
+    name: string | null;
+    email: string | null;
+  };
+  edition: {
+    name: string;
+    region: string;
+  };
+  categories: Array<{ category: { name: string } }>;
+  tags: Array<{ tag: { name: string } }>;
+};
+
+function isSameStory(left: Pick<EditorialStory, "id" | "slug" | "href">, right: Pick<EditorialStory, "id" | "slug" | "href">) {
+  return left.id === right.id || left.slug === right.slug || left.href === right.href;
+}
+
+function summarizeBody(body: Prisma.JsonValue) {
+  if (!body || typeof body !== "object" || !("content" in body) || !Array.isArray(body.content)) {
+    return [];
+  }
+
+  return body.content
+    .map((node) => {
+      if (!node || typeof node !== "object") {
+        return null;
+      }
+
+      if ("text" in node && typeof node.text === "string" && node.text.trim()) {
+        return node.text.trim();
+      }
+
+      if ("items" in node && Array.isArray(node.items)) {
+        return node.items.map((item) => String(item).trim()).filter(Boolean).join(" ");
+      }
+
+      return null;
+    })
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 3);
+}
+
+export function toEditorialStoryFromArticle(article: HomepageHeroArticle): EditorialStory {
+  const category = article.categories[0]?.category.name ?? article.articleType;
+  const summary = article.excerpt?.trim() || article.title;
+  const content = summarizeBody(article.body);
+
+  return {
+    id: article.id,
+    slug: article.slug,
+    href: `/articles/${article.slug}`,
+    title: article.title,
+    category,
+    edition: article.edition.name,
+    region: article.edition.region,
+    summary,
+    content: content.length ? content : [summary],
+    featuredImageUrl: article.featuredImageUrl,
+    featuredImageAlt: article.featuredImageAlt ?? article.title,
+    author: {
+      name: article.author.name ?? article.author.email ?? siteConfig.name,
+      role: `${siteConfig.name} newsroom`,
+    },
+    publishedAt: (article.publishedAt ?? article.updatedAt).toISOString(),
+    readingTimeMinutes: article.readingTimeMinutes,
+    tags: article.tags.map((item) => item.tag.name),
+    seoTitle: article.title,
+    seoDescription: summary,
+    sourceName: siteConfig.name,
+    sourceUrl: null,
+    provider: "cms",
+    isExternal: false,
+    isBreaking: false,
+    isOpinion: article.articleType === "OPINION" || article.articleType === "EDITORIAL",
+    isLive: article.articleType === "LIVE_BLOG",
+    isMostRead: false,
+  };
+}
+
+export function applyHomepageHeroSelection(
+  bundle: HomepageNewsBundle,
+  manualHero: EditorialStory | null,
+  fallbackHero: EditorialStory | null,
+) {
+  const heroStory = manualHero ?? fallbackHero ?? bundle.heroStory;
+
+  return {
+    ...bundle,
+    heroStory,
+    topStories: bundle.topStories.filter((story) => !isSameStory(story, heroStory)),
+  } satisfies HomepageNewsBundle;
+}

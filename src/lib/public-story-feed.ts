@@ -17,6 +17,8 @@ export type PublicStoryFeedItem = {
   imageUrl: string | null;
   imageAlt: string | null;
   region?: string | null;
+  deletedAt?: Date | string | null;
+  status?: string | null;
 };
 
 export type PublicNavItem = {
@@ -81,31 +83,73 @@ export function dedupePublicStoryImages<T extends { imageUrl?: string | null }>(
 }
 
 export function dedupePublicStoriesById<T extends { id: string; slug?: string; href?: string }>(stories: readonly T[]) {
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenSlugs = new Set<string>();
 
   return stories.filter((story) => {
-    const key = story.id || story.slug || story.href;
-    if (!key || seen.has(key)) {
+    const idKey = story.id;
+    const slugKey = story.slug ?? story.href ?? "";
+    if (!idKey || seenIds.has(idKey) || (slugKey && seenSlugs.has(slugKey))) {
       return false;
     }
 
-    seen.add(key);
+    seenIds.add(idKey);
+    if (slugKey) {
+      seenSlugs.add(slugKey);
+    }
     return true;
   });
 }
 
 export function dedupeNewsroomArticlesById<T extends { id: string; slug?: string }>(articles: readonly T[]) {
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenSlugs = new Set<string>();
 
   return articles.filter((article) => {
-    const key = article.id || article.slug;
-    if (!key || seen.has(key)) {
+    const idKey = article.id;
+    const slugKey = article.slug ?? "";
+    if (!idKey || seenIds.has(idKey) || (slugKey && seenSlugs.has(slugKey))) {
       return false;
     }
 
-    seen.add(key);
+    seenIds.add(idKey);
+    if (slugKey) {
+      seenSlugs.add(slugKey);
+    }
     return true;
   });
+}
+
+export function isPublicStoryRenderable(story: Pick<PublicStoryFeedItem, "deletedAt" | "status" | "href">) {
+  if (story.deletedAt) {
+    return false;
+  }
+
+  if (story.status && story.status !== "PUBLISHED") {
+    return false;
+  }
+
+  return Boolean(story.href);
+}
+
+export function filterRenderablePublicStories<T extends PublicStoryFeedItem>(stories: readonly T[]) {
+  return stories.filter((story) => isPublicStoryRenderable(story));
+}
+
+export function isNewsroomArticleRenderable(article: { deletedAt?: Date | string | null; status?: string | null; slug?: string | null }) {
+  if (article.deletedAt) {
+    return false;
+  }
+
+  if (article.status && article.status !== "PUBLISHED") {
+    return false;
+  }
+
+  return Boolean(article.slug);
+}
+
+export function filterRenderableNewsroomArticles<T extends { deletedAt?: Date | string | null; status?: string | null; slug?: string | null }>(articles: readonly T[]) {
+  return articles.filter((article) => isNewsroomArticleRenderable(article));
 }
 
 export function formatPublicStoryDate(value: Date | string | null | undefined) {
@@ -174,6 +218,8 @@ function resolveStoryImage(input: {
 type PublicArticleSource = Pick<NewsroomArticleCard, "id" | "slug" | "title" | "excerpt" | "articleType" | "publishedAt" | "edition" | "categories"> & {
   featuredImageUrl?: string | null;
   featuredImageAlt?: string | null;
+  deletedAt?: Date | null;
+  status?: string | null;
 };
 
 export function toPublicStoryFromArticle(article: PublicArticleSource): PublicStoryFeedItem {
@@ -194,6 +240,8 @@ export function toPublicStoryFromArticle(article: PublicArticleSource): PublicSt
     }),
     imageAlt: article.featuredImageAlt ?? article.title,
     region: article.edition.region,
+    deletedAt: article.deletedAt ?? null,
+    status: article.status ?? "PUBLISHED",
   };
 }
 
@@ -261,7 +309,7 @@ export async function getCategoryStories(slug: string) {
       take: 18,
     });
 
-    return dedupePublicStoriesById(articles.map(toPublicStoryFromArticle));
+    return dedupePublicStoriesById(filterRenderablePublicStories(articles.map(toPublicStoryFromArticle)));
   } catch {
     const stories = await getHomepageFallbackStories();
     return stories
@@ -307,7 +355,7 @@ export async function getSectionStories(section: keyof typeof PUBLIC_CATEGORY_CO
       take: 18,
     });
 
-    return dedupePublicStoriesById(articles
+    return dedupePublicStoriesById(filterRenderablePublicStories(articles
       .filter((article) => {
         if (section === "finance") {
           return article.categories.some((item) => matchesExactCategory(item.category.name, expected))
@@ -316,7 +364,7 @@ export async function getSectionStories(section: keyof typeof PUBLIC_CATEGORY_CO
 
         return article.categories.some((item) => matchesExactCategory(item.category.name, expected));
       })
-      .map(toPublicStoryFromArticle));
+      .map(toPublicStoryFromArticle)));
   } catch {
     const stories = await getHomepageFallbackStories();
     return filterExactSectionEditorialStories(stories, section).slice(0, 18).map(toPublicStoryFromEditorial);
@@ -364,11 +412,11 @@ export async function getTopicStories(slug: string) {
       take: 18,
     });
 
-    return dedupePublicStoriesById(articles
+    return dedupePublicStoriesById(filterRenderablePublicStories(articles
       .filter((article) =>
         article.categories.some((item) => matchesExactCategory(item.category.name, expected))
         || article.tags.some((item) => matchesExactCategory(item.tag.name, expected)))
-      .map(toPublicStoryFromArticle));
+      .map(toPublicStoryFromArticle)));
   } catch {
     const stories = await getHomepageFallbackStories();
     return filterExactTopicEditorialStories(stories, topicSlug).slice(0, 18).map(toPublicStoryFromEditorial);

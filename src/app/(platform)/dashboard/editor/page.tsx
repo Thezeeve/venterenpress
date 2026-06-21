@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { HomepageHeroButton } from "@/components/editor/homepage-hero-button";
 import { NewsroomEditor } from "@/components/editor/newsroom-editor";
 import { ArticleStatusBadge } from "@/components/dashboard/article-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getHomepageHeroArticleId } from "@/lib/articles";
 import { prisma } from "@/lib/prisma";
 import { requireDashboardUser } from "@/lib/server-auth";
 
@@ -31,7 +33,7 @@ function formatUpdatedAt(value: Date) {
 
 export default async function EditorDashboardPage() {
   const user = await requireDashboardUser("articleCreate");
-  const [articles, categories, editions] = await Promise.all([
+  const [articles, categories, editions, homepageHeroArticleId] = await Promise.all([
     prisma.article.findMany({
       where: { deletedAt: null },
       include: {
@@ -45,6 +47,7 @@ export default async function EditorDashboardPage() {
     }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.edition.findMany({ orderBy: { name: "asc" } }),
+    getHomepageHeroArticleId().catch(() => null),
   ]);
 
   const recentArticles = articles.filter((article) => !isDemoArticle(article)).slice(0, 6);
@@ -95,14 +98,21 @@ export default async function EditorDashboardPage() {
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[var(--muted-foreground)]">
                       <span>{article.categories[0]?.category.name ?? "Uncategorized"}</span>
                       <span>Updated {formatUpdatedAt(article.updatedAt)}</span>
+                      {homepageHeroArticleId === article.id ? <Badge variant="neutral">Homepage Hero</Badge> : null}
                     </div>
                   </div>
                   <ArticleStatusBadge status={article.status} />
                 </div>
-                <div className="mt-5">
+                <div className="mt-5 flex flex-wrap gap-3">
                   <Button asChild size="sm" variant="outline">
                     <Link href={`/admin/articles/${article.id}/edit`}>Edit</Link>
                   </Button>
+                  <HomepageHeroButton
+                    articleId={article.id}
+                    isHomepageHero={homepageHeroArticleId === article.id}
+                    disabled={article.status !== "PUBLISHED"}
+                    compact
+                  />
                 </div>
               </div>
             )) : (

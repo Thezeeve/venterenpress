@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { NewsroomArticleCard } from "@/lib/newsroom";
-import { dedupeNewsroomArticlesById } from "@/lib/public-story-feed";
+import { dedupeNewsroomArticlesById, filterRenderableNewsroomArticles } from "@/lib/public-story-feed";
 
 export function DiscoveryPage({
   badge,
@@ -23,7 +23,7 @@ export function DiscoveryPage({
   sidebarDescription: string;
   sidebarLinks: { label: string; href: string }[];
 }) {
-  const dedupedArticles = dedupeNewsroomArticlesById(articles);
+  const dedupedArticles = dedupeNewsroomArticlesById(filterRenderableNewsroomArticles(articles));
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">

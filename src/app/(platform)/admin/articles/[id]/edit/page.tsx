@@ -4,7 +4,7 @@ import { NewsroomEditor } from "@/components/editor/newsroom-editor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getArticleById } from "@/lib/articles";
+import { getArticleById, getHomepageHeroArticleId } from "@/lib/articles";
 import { prisma } from "@/lib/prisma";
 import { requireDashboardUser } from "@/lib/server-auth";
 
@@ -17,10 +17,11 @@ export default async function EditAdminArticlePage({
 }) {
   const user = await requireDashboardUser("articleEdit");
   const { id } = await params;
-  const [article, categories, editions] = await Promise.all([
+  const [article, categories, editions, homepageHeroArticleId] = await Promise.all([
     getArticleById(id),
     prisma.category.findMany({ orderBy: { name: "asc" } }).catch(() => []),
     prisma.edition.findMany({ orderBy: { name: "asc" } }).catch(() => []),
+    getHomepageHeroArticleId().catch(() => null),
   ]);
 
   if (!article) {
@@ -64,6 +65,7 @@ export default async function EditAdminArticlePage({
               tagSlugs: article.tags.map((item) => item.tag.slug),
               featuredImageUrl: article.featuredImageUrl,
               featuredImageAlt: article.featuredImageAlt,
+              isHomepageHero: homepageHeroArticleId === article.id,
             }}
             categoryOptions={categories.map((item) => ({ label: item.name, value: item.slug }))}
             editionOptions={editions.map((item) => ({ label: item.name, value: item.code }))}

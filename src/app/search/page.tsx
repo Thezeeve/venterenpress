@@ -7,6 +7,7 @@ import { isDatabaseAvailable } from "@/lib/database-availability";
 import {
   dedupePublicStoriesById,
   dedupePublicStoryImages,
+  filterRenderablePublicStories,
   formatPublicStoryDate,
   getHomepageFallbackStories,
   toPublicStoryFromArticle,
@@ -116,7 +117,9 @@ export default async function SearchPage({
   })();
 
   const storyCards = dedupePublicStoryImages(
-    dedupePublicStoriesById((results as NewsroomArticleCard[]).map((article) => toPublicStoryFromArticle(article))),
+    dedupePublicStoriesById(
+      filterRenderablePublicStories((results as NewsroomArticleCard[]).map((article) => toPublicStoryFromArticle(article))),
+    ),
   );
 
   return (
