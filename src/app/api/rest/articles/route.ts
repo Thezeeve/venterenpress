@@ -6,15 +6,39 @@ import { validateBrowserMutation } from "@/lib/security";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleInputSchema } from "@/lib/validation";
 
-function revalidateArticlePaths(slug: string, categorySlugs: string[]) {
-  revalidatePath("/");
-  revalidatePath("/latest");
-  revalidatePath(`/articles/${slug}`);
+function revalidateArticlePaths(input: {
+  slugs?: string[];
+  categorySlugs?: string[];
+  tagSlugs?: string[];
+}) {
+  const paths = new Set<string>([
+    "/",
+    "/latest",
+    "/search",
+    "/categories",
+    "/topics",
+    "/tags",
+    "/feed.xml",
+    "/sitemap.xml",
+  ]);
 
-  for (const categorySlug of categorySlugs) {
-    revalidatePath(`/categories/${categorySlug}`);
-    revalidatePath(`/${categorySlug}`);
-  }
+  input.slugs?.filter(Boolean).forEach((slug) => {
+    paths.add(`/articles/${slug}`);
+  });
+
+  input.categorySlugs?.filter(Boolean).forEach((slug) => {
+    paths.add(`/categories/${slug}`);
+    paths.add(`/${slug}`);
+    paths.add(`/topics/${slug}`);
+  });
+
+  input.tagSlugs?.filter(Boolean).forEach((slug) => {
+    paths.add(`/tags/${slug}`);
+    paths.add(`/topics/${slug}`);
+    paths.add(`/${slug}`);
+  });
+
+  paths.forEach((path) => revalidatePath(path));
 }
 
 export async function GET(request: NextRequest) {
@@ -62,7 +86,11 @@ export async function POST(request: NextRequest) {
       data: parsed.data,
     });
 
-    revalidateArticlePaths(article.slug, parsed.data.categorySlugs);
+    revalidateArticlePaths({
+      slugs: [article.slug],
+      categorySlugs: parsed.data.categorySlugs,
+      tagSlugs: parsed.data.tagSlugs,
+    });
 
     return NextResponse.json({ data: article }, { status: 201 });
   } catch (error) {

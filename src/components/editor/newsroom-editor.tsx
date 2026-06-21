@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import Link from "next/link";
-import { ChevronDown, Eye, Globe2, ImagePlus, Laptop, LoaderCircle, Quote, Save, SendHorizontal, Smartphone } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, Eye, Globe2, ImagePlus, Laptop, LoaderCircle, Quote, Save, SendHorizontal, Smartphone, Trash2 } from "lucide-react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import LinkExtension from "@tiptap/extension-link";
@@ -12,6 +13,14 @@ import { ArticleBody } from "@/components/article/article-body";
 import { ConditionalNewsImage } from "@/components/newsroom/conditional-news-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,7 +68,9 @@ export function NewsroomEditor({
   editionOptions: Option[];
   currentUserRole: Role;
 }) {
+  const router = useRouter();
   const canPublish = hasPermission(currentUserRole, "articlePublish");
+  const canDelete = hasPermission(currentUserRole, "articleDelete");
   const [activeView, setActiveView] = useState<"compose" | "preview">("compose");
   const [title, setTitle] = useState(initialArticle?.title ?? "");
   const [slug, setSlug] = useState(initialArticle?.slug ?? "");
@@ -82,6 +93,8 @@ export function NewsroomEditor({
   const [autosaveStatus, setAutosaveStatus] = useState(articleId ? "Autosave ready" : "Draft not saved yet");
   const [preview, setPreview] = useState<"desktop" | "mobile">("desktop");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "publishing">("idle");
+  const [deleteState, setDeleteState] = useState<"idle" | "deleting">("idle");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
@@ -340,6 +353,36 @@ export function NewsroomEditor({
     setImageUploadMessage("");
   }
 
+  async function deleteArticle() {
+    if (!currentArticleId || deleteState !== "idle") {
+      return;
+    }
+
+    setDeleteState("deleting");
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const response = await fetch(`/api/rest/articles/${currentArticleId}`, {
+        method: "DELETE",
+      });
+      const responseBody = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(responseBody, "Unable to delete article."));
+      }
+
+      setIsDeleteDialogOpen(false);
+      setSuccessMessage("Article deleted successfully.");
+      router.push("/dashboard/editor");
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(`Delete failed. ${error instanceof Error ? error.message : "Unable to delete article."}`);
+    } finally {
+      setDeleteState("idle");
+    }
+  }
+
   async function submitArticle(intent: "draft" | "publish") {
     if (!editor) {
       return;
@@ -418,7 +461,7 @@ export function NewsroomEditor({
         body: JSON.stringify(payload),
       });
 
-      const responseBody = (await response.json().catch(() => null)) as { data?: { id: string; slug: string } } | null;
+      const responseBody = (await response.json().catch(() => null)) as { data?: { id: string; slug: string; status?: string } } | null;
       logSubmitDebug("Article submit response", {
         articleId: currentArticleId || null,
         intent,
@@ -440,7 +483,7 @@ export function NewsroomEditor({
       const nextArticleId = responseBody?.data?.id ?? currentArticleId;
       const nextSlug = responseBody?.data?.slug ?? payload.slug;
       setCurrentArticleId(nextArticleId);
-      setCurrentStatus(intent === "publish" ? "PUBLISHED" : "DRAFT");
+      setCurrentStatus(responseBody?.data?.status ?? (intent === "publish" ? "PUBLISHED" : "DRAFT"));
       if (intent === "publish") {
         setPublicArticleHref(`/articles/${nextSlug}`);
       }
@@ -775,6 +818,18 @@ export function NewsroomEditor({
                 {submitState === "publishing" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
                 {submitState === "publishing" ? "Publishing..." : "Publish"}
               </Button>
+              {currentArticleId && canDelete ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start border-[#D8261D]/25 text-[#8A1C16] hover:bg-[#D8261D]/8 hover:text-[#8A1C16]"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={deleteState !== "idle"}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Article
+                </Button>
+              ) : null}
             </div>
 
             <div className="space-y-3 rounded-[22px] bg-[rgba(243,240,234,0.88)] p-4 text-sm">
@@ -828,6 +883,36 @@ export function NewsroomEditor({
           </div>
         </details>
       </aside>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete article?</DialogTitle>
+            <DialogDescription>
+              This will archive the article and remove it from public listings, search, feeds, and sitemap output after revalidation.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={deleteState === "deleting"}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-[#D8261D] hover:bg-[#bf1f18]"
+              onClick={() => void deleteArticle()}
+              disabled={deleteState === "deleting"}
+            >
+              {deleteState === "deleting" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleteState === "deleting" ? "Deleting..." : "Delete Article"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

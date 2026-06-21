@@ -5,6 +5,7 @@ import { SearchBox } from "@/components/search/search-box";
 import { PublicStoryCard } from "@/components/newsroom/public-story-card";
 import { isDatabaseAvailable } from "@/lib/database-availability";
 import {
+  dedupePublicStoriesById,
   dedupePublicStoryImages,
   formatPublicStoryDate,
   getHomepageFallbackStories,
@@ -115,7 +116,7 @@ export default async function SearchPage({
   })();
 
   const storyCards = dedupePublicStoryImages(
-    (results as NewsroomArticleCard[]).map((article) => toPublicStoryFromArticle(article)),
+    dedupePublicStoriesById((results as NewsroomArticleCard[]).map((article) => toPublicStoryFromArticle(article))),
   );
 
   return (

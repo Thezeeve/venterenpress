@@ -59,7 +59,7 @@ describe("article persistence", () => {
   });
 
   it("writes featuredImageUrl during article update", async () => {
-    await updateArticle({
+    const updated = await updateArticle({
       actor: { id: "user-1", role: "MANAGING_EDITOR" as never },
       articleId: "article-1",
       data: {
@@ -87,7 +87,9 @@ describe("article persistence", () => {
       },
     });
 
+    expect(updated.id).toBe("article-1");
     expect(mocks.prisma.article.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "article-1" },
       data: expect.objectContaining({
         featuredImageUrl: "https://cdn.example.com/uploads/fresh-image.png",
         featuredImageAlt: "Fresh uploaded image",

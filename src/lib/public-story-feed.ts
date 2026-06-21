@@ -80,6 +80,34 @@ export function dedupePublicStoryImages<T extends { imageUrl?: string | null }>(
   });
 }
 
+export function dedupePublicStoriesById<T extends { id: string; slug?: string; href?: string }>(stories: readonly T[]) {
+  const seen = new Set<string>();
+
+  return stories.filter((story) => {
+    const key = story.id || story.slug || story.href;
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+export function dedupeNewsroomArticlesById<T extends { id: string; slug?: string }>(articles: readonly T[]) {
+  const seen = new Set<string>();
+
+  return articles.filter((article) => {
+    const key = article.id || article.slug;
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
 export function formatPublicStoryDate(value: Date | string | null | undefined) {
   if (!value) {
     return "Latest coverage";
@@ -233,7 +261,7 @@ export async function getCategoryStories(slug: string) {
       take: 18,
     });
 
-    return articles.map(toPublicStoryFromArticle);
+    return dedupePublicStoriesById(articles.map(toPublicStoryFromArticle));
   } catch {
     const stories = await getHomepageFallbackStories();
     return stories
@@ -279,7 +307,7 @@ export async function getSectionStories(section: keyof typeof PUBLIC_CATEGORY_CO
       take: 18,
     });
 
-    return articles
+    return dedupePublicStoriesById(articles
       .filter((article) => {
         if (section === "finance") {
           return article.categories.some((item) => matchesExactCategory(item.category.name, expected))
@@ -288,7 +316,7 @@ export async function getSectionStories(section: keyof typeof PUBLIC_CATEGORY_CO
 
         return article.categories.some((item) => matchesExactCategory(item.category.name, expected));
       })
-      .map(toPublicStoryFromArticle);
+      .map(toPublicStoryFromArticle));
   } catch {
     const stories = await getHomepageFallbackStories();
     return filterExactSectionEditorialStories(stories, section).slice(0, 18).map(toPublicStoryFromEditorial);
@@ -336,11 +364,11 @@ export async function getTopicStories(slug: string) {
       take: 18,
     });
 
-    return articles
+    return dedupePublicStoriesById(articles
       .filter((article) =>
         article.categories.some((item) => matchesExactCategory(item.category.name, expected))
         || article.tags.some((item) => matchesExactCategory(item.tag.name, expected)))
-      .map(toPublicStoryFromArticle);
+      .map(toPublicStoryFromArticle));
   } catch {
     const stories = await getHomepageFallbackStories();
     return filterExactTopicEditorialStories(stories, topicSlug).slice(0, 18).map(toPublicStoryFromEditorial);

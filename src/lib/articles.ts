@@ -524,7 +524,18 @@ export async function softDeleteArticle(input: {
       deletedAt: new Date(),
       status: ArticleStatus.ARCHIVED,
     },
+    include: {
+      categories: { include: { category: true } },
+      tags: { include: { tag: true } },
+    },
   });
+
+  await prisma.searchDocument.deleteMany({
+    where: {
+      entityType: "article",
+      entityId: input.articleId,
+    },
+  }).catch(() => null);
 
   await writeAuditLog({
     userId: input.actor.id,

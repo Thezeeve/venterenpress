@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { NewsroomArticleCard } from "@/lib/newsroom";
+import { dedupeNewsroomArticlesById } from "@/lib/public-story-feed";
 
 export function DiscoveryPage({
   badge,
@@ -22,6 +23,8 @@ export function DiscoveryPage({
   sidebarDescription: string;
   sidebarLinks: { label: string; href: string }[];
 }) {
+  const dedupedArticles = dedupeNewsroomArticlesById(articles);
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
@@ -31,7 +34,7 @@ export function DiscoveryPage({
           <p className="max-w-3xl text-lg leading-8 text-[var(--muted-foreground)]">{description}</p>
           <div className="grid gap-4 md:grid-cols-3">
             {[
-              ["Coverage", `${articles.length} live stories`],
+              ["Coverage", `${dedupedArticles.length} live stories`],
               ["Format", "Category, region, and topic landing layout"],
               ["Trust", "Structured metadata, source notes, and review labels"],
             ].map(([label, value]) => (
@@ -71,8 +74,8 @@ export function DiscoveryPage({
             <CardDescription>Chronological stories from this desk or edition.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {articles.length ? (
-              articles.map((article) => (
+            {dedupedArticles.length ? (
+              dedupedArticles.map((article) => (
                 <Link
                   key={article.id}
                   href={`/articles/${article.slug}`}

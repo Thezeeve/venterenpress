@@ -8,6 +8,7 @@ vi.mock("@/lib/news-providers", () => ({
 }));
 
 import {
+  dedupePublicStoriesById,
   dedupePublicStoryImages,
   getCategoryStories,
   getSectionStories,
@@ -86,5 +87,16 @@ describe("public story feed integrity", () => {
     expect(stories[2]?.imageUrl).toBe("/news/world/world2.jpg");
     expect(stories[3]?.imageUrl).toBeNull();
     expect(stories[4]?.imageUrl).toBeNull();
+  });
+
+  it("deduplicates repeated stories by article id before rendering", () => {
+    const stories = dedupePublicStoriesById([
+      { id: "article-1", slug: "alpha" },
+      { id: "article-1", slug: "alpha-updated" },
+      { id: "article-2", slug: "beta" },
+    ]);
+
+    expect(stories).toHaveLength(2);
+    expect(stories.map((story) => story.id)).toEqual(["article-1", "article-2"]);
   });
 });

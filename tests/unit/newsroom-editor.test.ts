@@ -10,6 +10,16 @@ vi.mock("next/link", () => ({
     createElement("a", { href, ...props }, children),
 }));
 
+const routerPush = vi.fn();
+const routerRefresh = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: routerPush,
+    refresh: routerRefresh,
+  }),
+}));
+
 vi.mock("next/image", () => ({
   default: ({ src, alt, ...props }: { src: string; alt: string }) =>
     createElement("img", { src, alt, ...props }),
@@ -35,6 +45,8 @@ const editionOptions = [{ label: "United States", value: "UNITED_STATES" }];
 describe("NewsroomEditor upload support", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    routerPush.mockReset();
+    routerRefresh.mockReset();
     if (!("createObjectURL" in URL)) {
       Object.defineProperty(URL, "createObjectURL", {
         configurable: true,
@@ -313,5 +325,81 @@ describe("NewsroomEditor upload support", () => {
 
     const requestBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
     expect(requestBody.featuredImageUrl).toBe("https://cdn.example.com/manual.jpg");
+  });
+
+  it("uses PATCH when editing an existing article id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: "article-99", slug: "edited-story", status: "DRAFT" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      createElement(NewsroomEditor, {
+        articleId: "article-99",
+        initialArticle: {
+          id: "article-99",
+          title: "Edited story",
+          slug: "edited-story",
+          excerpt: "Existing excerpt with enough detail to satisfy editorial validation rules.",
+          status: "DRAFT",
+          editionCode: "UNITED_STATES",
+          categorySlugs: ["technology"],
+        },
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/rest/articles/article-99",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
+  });
+
+  it("shows a delete confirmation modal and deletes the current article", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: "article-99", slug: "edited-story" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      createElement(NewsroomEditor, {
+        articleId: "article-99",
+        initialArticle: {
+          id: "article-99",
+          title: "Edited story",
+          slug: "edited-story",
+          excerpt: "Existing excerpt with enough detail to satisfy editorial validation rules.",
+          status: "DRAFT",
+          editionCode: "UNITED_STATES",
+          categorySlugs: ["technology"],
+        },
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.EDITOR_IN_CHIEF,
+      }),
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "Delete Article" })[0]!);
+    expect(await screen.findByText("Delete article?")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Delete Article" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/rest/articles/article-99",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+    expect(routerPush).toHaveBeenCalledWith("/dashboard/editor");
+    expect(routerRefresh).toHaveBeenCalled();
   });
 });

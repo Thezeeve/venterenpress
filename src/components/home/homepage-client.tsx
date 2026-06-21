@@ -162,6 +162,30 @@ function toSectionStory(article: EditorialStory, image: string | null): SectionS
   };
 }
 
+function getStoryIdentity(story: Pick<EditorialStory, "id" | "slug" | "href">) {
+  return story.id || story.href || story.slug || "";
+}
+
+function takeUniqueStories(stories: readonly EditorialStory[], seen: Set<string>, count?: number) {
+  const uniqueStories: EditorialStory[] = [];
+
+  for (const story of stories) {
+    const key = getStoryIdentity(story);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    uniqueStories.push(story);
+
+    if (count && uniqueStories.length >= count) {
+      break;
+    }
+  }
+
+  return uniqueStories;
+}
+
 function StoryAnchor({
   href,
   isExternal,
@@ -586,8 +610,9 @@ export function HomepageClient({
     };
   }, [newsResponse.lastUpdated, refreshIntervalMinutes]);
 
-  const topStoryCards: SectionStory[] = bundle.topStories
-    .slice(0, 4)
+  const renderedStoryIds = new Set<string>([getStoryIdentity(bundle.heroStory)]);
+  const uniqueTopStories = takeUniqueStories(bundle.topStories, renderedStoryIds, 4);
+  const topStoryCards: SectionStory[] = uniqueTopStories
     .map((article) => toSectionStory(article, assignHomepageStoryImage(article)));
   const trendingStories = selectTrendingStories(
     [
@@ -604,38 +629,31 @@ export function HomepageClient({
   );
 
   const sectionPanels = [
-    {
-      title: "World News",
-      featured: toSectionStory(bundle.worldNews[0] ?? bundle.heroStory, assignHomepageStoryImage(bundle.worldNews[0] ?? bundle.heroStory)),
-      stories: bundle.worldNews.slice(1, 3).map((article) => toSectionStory(article, assignHomepageStoryImage(article))),
-    },
-    {
-      title: "Business",
-      featured: toSectionStory(bundle.businessNews[0] ?? bundle.heroStory, assignHomepageStoryImage(bundle.businessNews[0] ?? bundle.heroStory)),
-      stories: bundle.businessNews.slice(1, 3).map((article) => toSectionStory(article, assignHomepageStoryImage(article))),
-    },
-    {
-      title: "Technology",
-      featured: toSectionStory(bundle.technologyNews[0] ?? bundle.heroStory, assignHomepageStoryImage(bundle.technologyNews[0] ?? bundle.heroStory)),
-      stories: bundle.technologyNews.slice(1, 3).map((article) => toSectionStory(article, assignHomepageStoryImage(article))),
-    },
-    {
-      title: "Sports",
-      featured: toSectionStory(bundle.sportsNews[0] ?? bundle.heroStory, assignHomepageStoryImage(bundle.sportsNews[0] ?? bundle.heroStory)),
-      stories: bundle.sportsNews.slice(1, 3).map((article) => toSectionStory(article, assignHomepageStoryImage(article))),
-    },
-  ];
-  const liveLeadStory = bundle.liveCoverage[0] ?? null;
+    { title: "World News", stories: takeUniqueStories(bundle.worldNews, renderedStoryIds, 3) },
+    { title: "Business", stories: takeUniqueStories(bundle.businessNews, renderedStoryIds, 3) },
+    { title: "Technology", stories: takeUniqueStories(bundle.technologyNews, renderedStoryIds, 3) },
+    { title: "Sports", stories: takeUniqueStories(bundle.sportsNews, renderedStoryIds, 3) },
+  ]
+    .map((panel) => ({
+      title: panel.title,
+      featured: panel.stories[0]
+        ? toSectionStory(panel.stories[0], assignHomepageStoryImage(panel.stories[0]))
+        : null,
+      stories: panel.stories.slice(1, 3).map((article) => toSectionStory(article, assignHomepageStoryImage(article))),
+    }))
+    .filter((panel): panel is { title: string; featured: SectionStory; stories: SectionStory[] } => Boolean(panel.featured));
+  const liveStories = takeUniqueStories(bundle.liveCoverage, renderedStoryIds, 3);
+  const liveLeadStory = liveStories[0] ?? null;
   const liveLeadImage = liveLeadStory ? assignHomepageStoryImage(liveLeadStory, { preferPremium: true }) : null;
-  const liveDevelopmentStories = bundle.liveCoverage.slice(1).map((story) => ({
+  const liveDevelopmentStories = liveStories.slice(1).map((story) => ({
     story,
     image: assignHomepageStoryImage(story),
   }));
-  const opinionStories = bundle.opinion.map((story) => ({
+  const opinionStories = takeUniqueStories(bundle.opinion, renderedStoryIds).map((story) => ({
     story,
     image: assignHomepageStoryImage(story),
   }));
-  const mostReadStories = bundle.mostRead.slice(0, 6).map((story) => ({
+  const mostReadStories = takeUniqueStories(bundle.mostRead, renderedStoryIds, 6).map((story) => ({
     story,
     image: assignHomepageStoryImage(story),
   }));
