@@ -62,8 +62,8 @@ export async function SiteHeader({ brand }: { brand: BrandConfig }) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-900 bg-[#04111F] text-white shadow-[0_10px_30px_rgba(0,0,0,0.28)]">
-      <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4 px-4 sm:px-8 lg:h-[74px] lg:gap-6 lg:px-8 xl:gap-8">
-        <div className="flex w-[274px] shrink-0 items-center xl:w-[300px]">
+      <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4 px-4 sm:px-8 lg:h-[74px] lg:gap-4 lg:px-8 xl:gap-6">
+        <div className="flex w-[250px] shrink-0 items-center xl:w-[290px]">
           <Link href="/" className="flex w-full items-center gap-3.5">
             <div className="relative h-10 w-10 shrink-0 md:h-11 md:w-11 lg:h-12 lg:w-12">
               <Image

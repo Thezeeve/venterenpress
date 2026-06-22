@@ -33,7 +33,7 @@ export function DesktopPrimaryNav({ navItems }: Pick<NavProps, "navItems">) {
   const pathname = usePathname();
 
   return (
-    <nav className="hidden flex-1 items-center justify-center gap-0.5 px-2 lg:flex xl:px-6">
+    <nav className="hidden flex-1 items-center justify-center gap-0 px-1 lg:flex xl:px-4">
       {navItems.map((item) => {
         const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href.split("?")[0]);
         return (
@@ -41,13 +41,13 @@ export function DesktopPrimaryNav({ navItems }: Pick<NavProps, "navItems">) {
             key={item.label}
             href={item.href}
             className={cn(
-              "relative inline-flex min-h-[40px] items-center justify-center rounded-full px-3.5 py-2 text-[0.9rem] font-medium tracking-[0.008em] text-white/82 transition duration-200 hover:bg-white/[0.045] hover:text-white xl:px-4 xl:text-[0.95rem]",
+              "relative inline-flex min-h-[38px] items-center justify-center rounded-full px-2.5 py-2 text-[0.82rem] font-medium tracking-[0.006em] text-white/82 transition duration-200 hover:bg-white/[0.045] hover:text-white xl:px-3.5 xl:text-[0.9rem]",
               isActive ? "bg-white/[0.035] text-white" : "",
             )}
           >
             {item.label}
             {isActive ? (
-              <span className="absolute inset-x-5 bottom-1.5 h-px rounded-full bg-[#E4554B] opacity-90 xl:inset-x-6" />
+              <span className="absolute inset-x-4 bottom-1.5 h-px rounded-full bg-[#E4554B] opacity-90 xl:inset-x-5" />
             ) : null}
           </Link>
         );
@@ -66,7 +66,7 @@ export function DesktopUtilityNav({
   );
 
   return (
-    <div className="hidden shrink-0 items-center gap-2 lg:flex">
+    <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
       <Link
         href="/search"
         aria-label="Search"
@@ -92,7 +92,7 @@ export function DesktopUtilityNav({
 
       <Link
         href="/pricing"
-        className="inline-flex h-9 min-w-[144px] items-center justify-center rounded-full bg-[#D71920] px-5 text-sm font-semibold whitespace-nowrap text-white shadow-[0_12px_24px_rgba(215,25,32,0.22)] transition hover:bg-[#bf171d] hover:shadow-[0_14px_28px_rgba(215,25,32,0.26)]"
+        className="inline-flex h-9 min-w-[128px] items-center justify-center rounded-full bg-[#D71920] px-4 text-[13px] font-semibold whitespace-nowrap text-white shadow-[0_12px_24px_rgba(215,25,32,0.22)] transition hover:bg-[#bf171d] hover:shadow-[0_14px_28px_rgba(215,25,32,0.26)] xl:min-w-[140px] xl:px-5 xl:text-sm"
       >
         Subscribe
       </Link>

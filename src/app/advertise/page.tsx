@@ -1,11 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isDatabaseAvailable } from "@/lib/database-availability";
 import { prisma } from "@/lib/prisma";
+import { buildPageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Advertise With VANTERENPRESS | Media Kit and Brand Partnerships",
+  description:
+    "Reach VANTERENPRESS readers through premium placements, sponsored content, press release distribution, and direct advertiser inquiry workflows.",
+  path: "/advertise",
+});
 
 export default async function AdvertisePage() {
   const [campaigns, placements, analytics] = await (async () => {
@@ -43,7 +52,10 @@ export default async function AdvertisePage() {
         Audience reach, premium placements, and sponsored content workflows for direct brand partnerships.
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Button asChild variant="outline"><Link href="/advertise/inquiry">Advertiser inquiry</Link></Button>
+        <Button asChild className="bg-[#D71920] text-white hover:bg-[#bf171d]">
+          <Link href="/advertise/inquiry">Start advertiser inquiry</Link>
+        </Button>
+        <Button asChild variant="outline"><Link href="/advertise/inquiry">Request media kit</Link></Button>
         <Button asChild variant="outline"><Link href="/advertise/sponsored-content">Sponsored content</Link></Button>
         <Button asChild variant="outline"><Link href="/advertise/press-release">Press release</Link></Button>
       </div>
