@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { ImageProps } from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Bookmark, RadioTower } from "lucide-react";
+import { Bookmark, ChevronLeft, ChevronRight, RadioTower } from "lucide-react";
 import { toRecommendationStory, selectTrendingStories } from "@/lib/article-experience";
 import { resolveArticleImage } from "@/lib/article-rendering";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,10 @@ type SectionStory = {
   time: string;
   image?: string | null;
   isExternal?: boolean;
+};
+
+type HeroSlide = EditorialStory & {
+  resolvedImageUrl: string | null;
 };
 
 const MotionDiv = motion.div;
@@ -329,29 +333,81 @@ function LatestSidebar({ items }: { items: LatestSidebarItem[] }) {
   );
 }
 
-function LeadHeroCard({ article }: { article: EditorialStory }) {
-  const heroImage = article.featuredImageUrl ?? null;
-  const [heroVisible, setHeroVisible] = useState(Boolean(heroImage));
+function LeadHeroCarousel({ slides }: { slides: HeroSlide[] }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [heroVisible, setHeroVisible] = useState(Boolean(slides[0]?.resolvedImageUrl));
+  const touchStartX = useRef<number | null>(null);
+  const slideCount = slides.length;
+  const activeSlide = slides[activeIndex] ?? slides[0];
 
   useEffect(() => {
-    setHeroVisible(Boolean(heroImage));
-  }, [heroImage]);
+    setActiveIndex((current) => Math.min(current, Math.max(slideCount - 1, 0)));
+  }, [slideCount]);
 
-  const hasHeroImage = Boolean(heroImage) && heroVisible;
+  useEffect(() => {
+    setHeroVisible(Boolean(activeSlide?.resolvedImageUrl));
+  }, [activeSlide?.resolvedImageUrl]);
+
+  if (!activeSlide) {
+    return null;
+  }
+
+  const hasHeroImage = Boolean(activeSlide.resolvedImageUrl) && heroVisible;
+  const canNavigate = slideCount > 1;
+  const goToSlide = (index: number) => {
+    if (!canNavigate) {
+      return;
+    }
+
+    setActiveIndex((index + slideCount) % slideCount);
+  };
+
+  const href = activeSlide.href ?? `/articles/${activeSlide.slug}`;
 
   return (
-    <StoryAnchor
-      href={article.href ?? `/articles/${article.slug}`}
-      isExternal={article.isExternal}
-      className="group block overflow-hidden rounded-2xl border border-[color:rgba(15,23,42,0.12)] shadow-[0_24px_48px_rgba(15,23,42,0.11)]"
+    <article
+      className="group relative overflow-hidden rounded-2xl border border-[color:rgba(15,23,42,0.12)] shadow-[0_24px_48px_rgba(15,23,42,0.11)]"
+      aria-roledescription="carousel"
+      aria-label="Top stories hero carousel"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          goToSlide(activeIndex - 1);
+        }
+
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          goToSlide(activeIndex + 1);
+        }
+      }}
+      onTouchStart={(event) => {
+        touchStartX.current = event.touches[0]?.clientX ?? null;
+      }}
+      onTouchEnd={(event) => {
+        const startX = touchStartX.current;
+        const endX = event.changedTouches[0]?.clientX ?? null;
+        touchStartX.current = null;
+
+        if (!canNavigate || startX === null || endX === null) {
+          return;
+        }
+
+        const delta = endX - startX;
+        if (Math.abs(delta) < 36) {
+          return;
+        }
+
+        goToSlide(delta > 0 ? activeIndex - 1 : activeIndex + 1);
+      }}
     >
       <div className={hasHeroImage ? "relative min-h-[392px] sm:min-h-[432px] lg:min-h-[468px]" : "bg-white p-5 sm:p-7 lg:p-8"}>
         {hasHeroImage ? (
           <>
             <SafeNewsImage
-              src={heroImage}
-              alt={article.featuredImageAlt ?? article.title}
-              priority
+              src={activeSlide.resolvedImageUrl}
+              alt={activeSlide.featuredImageAlt ?? activeSlide.title}
+              priority={activeIndex === 0}
               quality={100}
               sizes="(max-width: 767px) 100vw, (max-width: 1279px) 100vw, 900px"
               className="object-cover object-[center_34%]"
@@ -362,27 +418,70 @@ function LeadHeroCard({ article }: { article: EditorialStory }) {
         ) : null}
         <div className={hasHeroImage ? "absolute inset-0 flex items-end p-5 sm:p-7 lg:p-8" : "flex items-end"}>
           <div className={hasHeroImage ? "max-w-[640px] text-white" : "max-w-[760px]"}>
-            <Badge className="border-0 bg-[#D8261D] text-white shadow-none">{article.category}</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-0 bg-[#D8261D] text-white shadow-none">{activeSlide.category}</Badge>
+              {canNavigate ? (
+                <span className={hasHeroImage ? "text-xs uppercase tracking-[0.16em] text-white/68" : "text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]"}>
+                  {activeIndex + 1} of {slideCount}
+                </span>
+              ) : null}
+            </div>
             <h1 className="mt-4 max-w-[660px] font-serif text-[clamp(33px,3vw,45px)] leading-[1.12] tracking-[-0.02em]">
-              {article.title}
+              {activeSlide.title}
             </h1>
             <p className={hasHeroImage ? "mt-4 max-w-[36rem] text-sm leading-7 text-white/82 sm:text-base" : "mt-4 max-w-[42rem] text-sm leading-7 text-[var(--muted-foreground)] sm:text-base"}>
-              {article.summary}
+              {activeSlide.summary}
             </p>
             <div className={hasHeroImage ? "mt-5 text-sm text-white/78" : "mt-5 text-sm text-[var(--muted-foreground)]"}>
-              {formatRelativeTime(article.publishedAt)}
+              {formatRelativeTime(activeSlide.publishedAt)}
             </div>
             <div className="mt-5">
               <ButtonStoryLink
-                href={article.href ?? `/articles/${article.slug}`}
-                isExternal={article.isExternal}
+                href={href}
+                isExternal={activeSlide.isExternal}
                 label="Read Full Story"
               />
             </div>
           </div>
         </div>
+        {canNavigate ? (
+          <>
+            <div className="absolute inset-y-0 left-0 hidden items-center pl-4 md:flex">
+              <button
+                type="button"
+                aria-label="Previous hero story"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/18 bg-black/28 text-white transition hover:bg-black/42 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
+                onClick={() => goToSlide(activeIndex - 1)}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="absolute inset-y-0 right-0 hidden items-center pr-4 md:flex">
+              <button
+                type="button"
+                aria-label="Next hero story"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/18 bg-black/28 text-white transition hover:bg-black/42 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
+                onClick={() => goToSlide(activeIndex + 1)}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-2 sm:bottom-5">
+              {slides.map((slide, index) => (
+                <button
+                  key={slide.id}
+                  type="button"
+                  aria-label={`Go to hero story ${index + 1}`}
+                  aria-current={index === activeIndex ? "true" : "false"}
+                  className={`h-2.5 rounded-full transition ${index === activeIndex ? "w-7 bg-[#D8261D]" : "w-2.5 bg-white/38 hover:bg-white/55"}`}
+                  onClick={() => goToSlide(index)}
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
-    </StoryAnchor>
+    </article>
   );
 }
 
@@ -572,8 +671,6 @@ export function HomepageClient({
     return nextImage.imageUrl;
   };
 
-  const heroStoryImage = assignHomepageStoryImage(bundle.heroStory, { preferPremium: true });
-
   useEffect(() => {
     setNewsResponse(initialNewsResponse);
   }, [initialNewsResponse]);
@@ -614,7 +711,14 @@ export function HomepageClient({
     };
   }, [newsResponse.lastUpdated, refreshIntervalMinutes]);
 
-  const renderedStoryIds = new Set<string>([getStoryIdentity(bundle.heroStory)]);
+  const heroSlides: HeroSlide[] = [
+    bundle.heroStory,
+    ...takeUniqueStories(bundle.topStories, new Set<string>([getStoryIdentity(bundle.heroStory)]), 3),
+  ].map((article) => ({
+    ...article,
+    resolvedImageUrl: assignHomepageStoryImage(article, { preferPremium: true }),
+  }));
+  const renderedStoryIds = new Set<string>(heroSlides.map((story) => getStoryIdentity(story)).filter(Boolean));
   const uniqueTopStories = takeUniqueStories(bundle.topStories, renderedStoryIds, 4);
   const topStoryCards: SectionStory[] = uniqueTopStories
     .map((article) => toSectionStory(article, assignHomepageStoryImage(article)));
@@ -689,7 +793,7 @@ export function HomepageClient({
         <div className="mx-auto max-w-[1480px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,68fr)_minmax(320px,32fr)] xl:grid-cols-[minmax(0,70fr)_minmax(330px,30fr)] xl:gap-5">
             <MotionDiv initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-              <LeadHeroCard article={{ ...bundle.heroStory, featuredImageUrl: heroStoryImage }} />
+              <LeadHeroCarousel slides={heroSlides} />
             </MotionDiv>
             <MotionDiv
               initial={{ opacity: 0, x: 18 }}

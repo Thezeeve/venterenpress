@@ -109,12 +109,30 @@ export function applyHomepageHeroSelection(
   bundle: HomepageNewsBundle,
   manualHero: EditorialStory | null,
   fallbackHero: EditorialStory | null,
+  heroCarouselStories: EditorialStory[] = [],
 ) {
   const heroStory = manualHero ?? fallbackHero ?? bundle.heroStory;
+  const seen = new Set<string>();
+  const mergedTopStories = [
+    ...heroCarouselStories,
+    ...bundle.topStories,
+  ].filter((story) => {
+    if (isSameStory(story, heroStory)) {
+      return false;
+    }
+
+    const key = story.id || story.href || story.slug;
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
 
   return {
     ...bundle,
     heroStory,
-    topStories: bundle.topStories.filter((story) => !isSameStory(story, heroStory)),
+    topStories: mergedTopStories,
   } satisfies HomepageNewsBundle;
 }

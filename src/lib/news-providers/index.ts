@@ -168,7 +168,7 @@ function filterHomepageBundleToVisibleStories(bundle: HomepageNewsBundle, visibl
 
 async function getHomepageHeroOverrides() {
   if (!await isDatabaseAvailable()) {
-    return { manualHero: null, fallbackHero: null, visibleCmsStoryIds: new Set<string>() };
+    return { manualHero: null, fallbackHero: null, heroCarouselStories: [] as EditorialStory[], visibleCmsStoryIds: new Set<string>() };
   }
 
   const articleInclude = {
@@ -194,7 +194,7 @@ async function getHomepageHeroOverrides() {
       ? setting.value.articleId
       : null;
 
-    const [manualHeroArticle, fallbackHeroArticle, visibleCmsArticles] = await Promise.all([
+    const [manualHeroArticle, fallbackHeroArticle, carouselArticles, visibleCmsArticles] = await Promise.all([
       manualHeroArticleId
         ? prisma.article.findFirst({
             where: { id: manualHeroArticleId, status: "PUBLISHED", deletedAt: null },
@@ -208,6 +208,12 @@ async function getHomepageHeroOverrides() {
       }),
       prisma.article.findMany({
         where: { status: "PUBLISHED", deletedAt: null },
+        include: articleInclude,
+        orderBy: [{ featured: "desc" }, { publishedAt: "desc" }, { updatedAt: "desc" }],
+        take: 5,
+      }),
+      prisma.article.findMany({
+        where: { status: "PUBLISHED", deletedAt: null },
         select: { id: true },
       }),
     ]);
@@ -215,10 +221,15 @@ async function getHomepageHeroOverrides() {
     return {
       manualHero: manualHeroArticle ? toEditorialStoryFromArticle(manualHeroArticle) : null,
       fallbackHero: fallbackHeroArticle ? toEditorialStoryFromArticle(fallbackHeroArticle) : null,
+      heroCarouselStories: [
+        manualHeroArticle ? toEditorialStoryFromArticle(manualHeroArticle) : null,
+        fallbackHeroArticle ? toEditorialStoryFromArticle(fallbackHeroArticle) : null,
+        ...carouselArticles.map(toEditorialStoryFromArticle),
+      ].filter((story): story is EditorialStory => Boolean(story)),
       visibleCmsStoryIds: new Set(visibleCmsArticles.map((article) => article.id)),
     };
   } catch {
-    return { manualHero: null, fallbackHero: null, visibleCmsStoryIds: new Set<string>() };
+    return { manualHero: null, fallbackHero: null, heroCarouselStories: [] as EditorialStory[], visibleCmsStoryIds: new Set<string>() };
   }
 }
 
@@ -648,6 +659,7 @@ export async function getHomepageNewsResponse(): Promise<HomepageNewsApiResponse
           filterHomepageBundleToVisibleStories(seedResponse.bundle, heroOverrides.visibleCmsStoryIds),
           heroOverrides.manualHero,
           heroOverrides.fallbackHero,
+          heroOverrides.heroCarouselStories,
         ),
       };
     }
@@ -663,6 +675,7 @@ export async function getHomepageNewsResponse(): Promise<HomepageNewsApiResponse
           filterHomepageBundleToVisibleStories(fresh.bundle, heroOverrides.visibleCmsStoryIds),
           heroOverrides.manualHero,
           heroOverrides.fallbackHero,
+          heroOverrides.heroCarouselStories,
         ),
       };
     }
@@ -677,6 +690,7 @@ export async function getHomepageNewsResponse(): Promise<HomepageNewsApiResponse
         filterHomepageBundleToVisibleStories(persisted.bundle, heroOverrides.visibleCmsStoryIds),
         heroOverrides.manualHero,
         heroOverrides.fallbackHero,
+        heroOverrides.heroCarouselStories,
       ),
     };
   } catch (error) {

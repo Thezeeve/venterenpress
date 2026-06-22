@@ -48,4 +48,31 @@ describe("homepage hero selection", () => {
     expect(updated.heroStory.slug).toBe("latest-published-story");
     expect(updated.heroStory.provider).toBe("cms");
   });
+
+  it("prioritizes additional published cms stories ahead of fallback top stories", () => {
+    const bundle = getSeedHomepageBundle();
+    const cmsStories = [
+      {
+        ...bundle.topStories[0]!,
+        id: "cms-2",
+        slug: "cms-story-2",
+        title: "CMS story two",
+        provider: "cms",
+        href: "/articles/cms-story-2",
+      },
+      {
+        ...bundle.topStories[1]!,
+        id: "cms-3",
+        slug: "cms-story-3",
+        title: "CMS story three",
+        provider: "cms",
+        href: "/articles/cms-story-3",
+      },
+    ];
+
+    const updated = applyHomepageHeroSelection(bundle, null, bundle.heroStory, cmsStories);
+
+    expect(updated.topStories[0]?.id).toBe("cms-2");
+    expect(updated.topStories[1]?.id).toBe("cms-3");
+  });
 });
