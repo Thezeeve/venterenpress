@@ -8,8 +8,16 @@ export type NewsroomArticleCard = {
   excerpt: string | null;
   status?: string | null;
   deletedAt?: Date | null;
+  featuredImage?: string | { url?: string | null; altText?: string | null } | null;
   featuredImageUrl?: string | null;
   featuredImageAlt?: string | null;
+  image?: string | { url?: string | null; altText?: string | null } | null;
+  imageUrl?: string | null;
+  coverImage?: string | { url?: string | null; altText?: string | null } | null;
+  thumbnail?: string | { url?: string | null; altText?: string | null } | null;
+  thumbnailUrl?: string | null;
+  mediaUrl?: string | null;
+  media?: { url?: string | null; thumbnailUrl?: string | null; altText?: string | null }[] | null;
   articleType: string;
   accessTier: string;
   readingTimeMinutes: number;
@@ -76,6 +84,14 @@ export const newsroomArticleInclude = {
   edition: true,
   categories: { include: { category: true } },
   tags: { include: { tag: true } },
+  media: {
+    select: {
+      url: true,
+      thumbnailUrl: true,
+      altText: true,
+    },
+    orderBy: { createdAt: "desc" as const },
+  },
 } as const;
 
 export const publicRouteCatalog = [

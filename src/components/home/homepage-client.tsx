@@ -7,6 +7,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Bookmark, RadioTower } from "lucide-react";
 import { toRecommendationStory, selectTrendingStories } from "@/lib/article-experience";
+import { resolveArticleImage } from "@/lib/article-rendering";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +19,6 @@ import type {
   HomepageNewsBundle,
   LatestSidebarItem,
 } from "@/lib/news-providers/types";
-import { resolveNewsImageSelection } from "@/lib/news-providers/sanitize-news-image";
 import {
   summarizeNewsletterPreferences,
   summarizeNotificationPreferences,
@@ -52,7 +52,7 @@ function normalizeHomepageImageSrc(src?: string | null) {
     return src;
   }
 
-  if (src.startsWith("https://")) {
+  if (src.startsWith("http://") || src.startsWith("https://")) {
     return src;
   }
 
@@ -80,7 +80,7 @@ function SafeNewsImage({
 }) {
   const [imageSrc, setImageSrc] = useState(normalizeHomepageImageSrc(src));
   const [hasError, setHasError] = useState(false);
-  const isRemoteImage = imageSrc?.startsWith("https://") ?? false;
+  const isRemoteImage = Boolean(imageSrc?.startsWith("http://") || imageSrc?.startsWith("https://"));
 
   useEffect(() => {
     setImageSrc(normalizeHomepageImageSrc(src));
@@ -139,15 +139,17 @@ function resolveStoryImage(
   article: Pick<EditorialStory, "slug" | "title" | "category" | "featuredImageUrl" | "summary">,
   options?: { usedImages?: readonly string[]; preferPremium?: boolean; minimumScore?: number },
 ) {
-  return resolveNewsImageSelection({
+  return resolveArticleImage({
     slug: article.slug,
     category: article.category,
     title: article.title,
     summary: article.summary,
+    featuredImageUrl: article.featuredImageUrl,
+  }, {
     usedImages: options?.usedImages,
     preferPremium: options?.preferPremium,
     minimumScore: options?.minimumScore,
-  }).imageUrl;
+  });
 }
 
 function toSectionStory(article: EditorialStory, image: string | null): SectionStory {
@@ -557,15 +559,15 @@ export function HomepageClient({
       minimumScore: options?.preferPremium ? 28 : 24,
     });
 
-    if (nextImage && usedImages.includes(nextImage)) {
+    if (nextImage.source !== "direct" && nextImage.imageUrl && usedImages.includes(nextImage.imageUrl)) {
       return null;
     }
 
-    if (nextImage) {
-      usedImages.push(nextImage);
+    if (nextImage.source !== "direct" && nextImage.imageUrl) {
+      usedImages.push(nextImage.imageUrl);
     }
 
-    return nextImage;
+    return nextImage.imageUrl;
   };
 
   const heroStoryImage = assignHomepageStoryImage(bundle.heroStory, { preferPremium: true });

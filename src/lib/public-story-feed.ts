@@ -1,5 +1,5 @@
 import { isDatabaseAvailable } from "@/lib/database-availability";
-import { resolveArticleHeroImage } from "@/lib/article-rendering";
+import { resolveArticleImage } from "@/lib/article-rendering";
 import { getHomepageNewsResponse } from "@/lib/news-providers";
 import type { EditorialStory, HomepageNewsBundle } from "@/lib/news-providers/types";
 import type { NewsroomArticleCard } from "@/lib/newsroom";
@@ -16,6 +16,7 @@ export type PublicStoryFeedItem = {
   publishedAt: Date | string | null;
   imageUrl: string | null;
   imageAlt: string | null;
+  imageSource?: "direct" | "fallback" | "none";
   region?: string | null;
   deletedAt?: Date | string | null;
   status?: string | null;
@@ -65,19 +66,24 @@ function hasExactTag(tags: readonly string[] | undefined, expected: string) {
   return (tags ?? []).some((tag) => normalizeExactLabel(tag) === normalizeExactLabel(expected));
 }
 
-export function dedupePublicStoryImages<T extends { imageUrl?: string | null }>(stories: readonly T[]) {
+export function dedupePublicStoryImages<T extends { imageUrl?: string | null; imageSource?: string | null }>(stories: readonly T[]) {
   const usedImages = new Set<string>();
 
   return stories.map((story) => {
     const imageUrl = story.imageUrl ?? null;
-    if (!imageUrl || usedImages.has(imageUrl)) {
+    const shouldPreserveImage = story.imageSource === "direct";
+
+    if (!imageUrl || (!shouldPreserveImage && usedImages.has(imageUrl))) {
       return {
         ...story,
         imageUrl: null,
       };
     }
 
-    usedImages.add(imageUrl);
+    if (!shouldPreserveImage) {
+      usedImages.add(imageUrl);
+    }
+
     return story;
   });
 }
@@ -204,41 +210,51 @@ function filterExactTopicEditorialStories(stories: readonly EditorialStory[], to
   return stories.filter((story) => matchesExactCategory(story.category, expected) || hasExactTag(story.tags, expected));
 }
 
-function resolveStoryImage(input: {
-  slug: string;
-  category: string;
-  title: string;
-  summary: string;
-  featuredImageUrl?: string | null;
-  imageUrl?: string | null;
-}) {
-  return resolveArticleHeroImage(input);
-}
-
 type PublicArticleSource = Pick<NewsroomArticleCard, "id" | "slug" | "title" | "excerpt" | "articleType" | "publishedAt" | "edition" | "categories"> & {
+  featuredImage?: string | { url?: string | null; altText?: string | null } | null;
   featuredImageUrl?: string | null;
   featuredImageAlt?: string | null;
+  image?: string | { url?: string | null; altText?: string | null } | null;
+  imageUrl?: string | null;
+  coverImage?: string | { url?: string | null; altText?: string | null } | null;
+  thumbnail?: string | { url?: string | null; altText?: string | null } | null;
+  thumbnailUrl?: string | null;
+  mediaUrl?: string | null;
+  media?: { url?: string | null; thumbnailUrl?: string | null; altText?: string | null }[] | null;
   deletedAt?: Date | null;
   status?: string | null;
 };
 
 export function toPublicStoryFromArticle(article: PublicArticleSource): PublicStoryFeedItem {
+  const category = article.categories[0]?.category.name ?? article.articleType;
+  const image = resolveArticleImage({
+    slug: article.slug,
+    category,
+    title: article.title,
+    summary: article.excerpt ?? "",
+    featuredImage: article.featuredImage,
+    featuredImageUrl: article.featuredImageUrl,
+    featuredImageAlt: article.featuredImageAlt,
+    image: article.image,
+    imageUrl: article.imageUrl,
+    coverImage: article.coverImage,
+    thumbnail: article.thumbnail,
+    thumbnailUrl: article.thumbnailUrl,
+    mediaUrl: article.mediaUrl,
+    media: article.media,
+  });
+
   return {
     id: article.id,
     slug: article.slug,
     href: `/articles/${article.slug}`,
     title: article.title,
     excerpt: article.excerpt,
-    category: article.categories[0]?.category.name ?? article.articleType,
+    category,
     publishedAt: article.publishedAt,
-    imageUrl: resolveStoryImage({
-      slug: article.slug,
-      category: article.categories[0]?.category.name ?? article.articleType,
-      title: article.title,
-      summary: article.excerpt ?? "",
-      featuredImageUrl: article.featuredImageUrl,
-    }),
-    imageAlt: article.featuredImageAlt ?? article.title,
+    imageUrl: image.imageUrl,
+    imageAlt: image.imageAlt ?? article.title,
+    imageSource: image.source,
     region: article.edition.region,
     deletedAt: article.deletedAt ?? null,
     status: article.status ?? "PUBLISHED",
@@ -246,6 +262,15 @@ export function toPublicStoryFromArticle(article: PublicArticleSource): PublicSt
 }
 
 export function toPublicStoryFromEditorial(story: EditorialStory): PublicStoryFeedItem {
+  const image = resolveArticleImage({
+    slug: story.slug,
+    category: story.category,
+    title: story.title,
+    summary: story.summary,
+    featuredImageUrl: story.featuredImageUrl,
+    featuredImageAlt: story.featuredImageAlt,
+  });
+
   return {
     id: story.id,
     slug: story.slug,
@@ -254,14 +279,9 @@ export function toPublicStoryFromEditorial(story: EditorialStory): PublicStoryFe
     excerpt: story.summary,
     category: story.category,
     publishedAt: story.publishedAt,
-    imageUrl: resolveStoryImage({
-      slug: story.slug,
-      category: story.category,
-      title: story.title,
-      summary: story.summary,
-      featuredImageUrl: story.featuredImageUrl,
-    }),
-    imageAlt: story.featuredImageAlt ?? story.title,
+    imageUrl: image.imageUrl,
+    imageAlt: image.imageAlt ?? story.title,
+    imageSource: image.source,
     region: story.region,
   };
 }

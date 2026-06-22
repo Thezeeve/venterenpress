@@ -19,7 +19,7 @@ function normalizeImageSrc(src?: string | null) {
     return null;
   }
 
-  if (src.startsWith("/") || src.startsWith("https://") || src.startsWith("blob:") || src.startsWith("data:")) {
+  if (src.startsWith("/") || src.startsWith("http://") || src.startsWith("https://") || src.startsWith("blob:") || src.startsWith("data:")) {
     return src;
   }
 
@@ -57,7 +57,7 @@ export function ConditionalNewsImage({
         sizes={sizes}
         quality={quality}
         priority={priority}
-        unoptimized={imageSrc.startsWith("https://") || imageSrc.startsWith("blob:") || imageSrc.startsWith("data:")}
+        unoptimized={imageSrc.startsWith("http://") || imageSrc.startsWith("https://") || imageSrc.startsWith("blob:") || imageSrc.startsWith("data:")}
         className={imageClassName}
         onError={() => setHasError(true)}
       />

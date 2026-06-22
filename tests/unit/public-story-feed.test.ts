@@ -91,6 +91,16 @@ describe("public story feed integrity", () => {
     expect(stories[4]?.imageUrl).toBeNull();
   });
 
+  it("preserves repeated direct cms images instead of stripping them from later cards", () => {
+    const stories = dedupePublicStoryImages([
+      { id: "1", imageUrl: "https://cdn.example.com/uploads/manual.jpg", imageSource: "direct" },
+      { id: "2", imageUrl: "https://cdn.example.com/uploads/manual.jpg", imageSource: "direct" },
+    ]);
+
+    expect(stories[0]?.imageUrl).toBe("https://cdn.example.com/uploads/manual.jpg");
+    expect(stories[1]?.imageUrl).toBe("https://cdn.example.com/uploads/manual.jpg");
+  });
+
   it("deduplicates repeated stories by article id before rendering", () => {
     const stories = dedupePublicStoriesById([
       { id: "article-1", slug: "alpha" },

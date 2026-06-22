@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import {
+  CalendarDays,
+  ChevronRight,
   Clock3,
   Crown,
 } from "lucide-react";
@@ -16,9 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { isDatabaseAvailable } from "@/lib/database-availability";
-import { resolveArticleHeroImage, selectArticlePageSource } from "@/lib/article-rendering";
+import { resolveArticleHeroImage, resolveArticleImage, selectArticlePageSource } from "@/lib/article-rendering";
 import { getHomepageNewsResponse, getHomepageStoryBySlug } from "@/lib/news-providers";
-import { resolveNewsImageSelection } from "@/lib/news-providers/sanitize-news-image";
 import { getSeedStoryBySlug, seededEditorialStories } from "@/lib/news-providers/seed-content";
 import {
   getNewsroomDeskLabel,
@@ -89,6 +91,74 @@ function getArticleCategoryPath(slugOrName: string | null | undefined) {
   }
 
   return resolvePublicTaxonomyHref(slugify(slugOrName));
+}
+
+function buildArticleHeaderMeta(items: Array<{ icon?: ReactNode; label: string | null | undefined }>) {
+  return items.filter((item): item is { icon?: ReactNode; label: string } => Boolean(item.label?.trim()));
+}
+
+function ArticleHeader({
+  breadcrumbs,
+  categoryLabel,
+  categoryHref,
+  secondaryBadge,
+  metaItems,
+  title,
+  summary,
+}: {
+  breadcrumbs: { label: string; href?: string }[];
+  categoryLabel: string;
+  categoryHref: string;
+  secondaryBadge?: ReactNode;
+  metaItems: Array<{ icon?: ReactNode; label: string }>;
+  title: string;
+  summary?: string | null;
+}) {
+  return (
+    <header className="space-y-4 sm:space-y-5">
+      <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+        {breadcrumbs.map((item, index) => (
+          <span key={`${item.label}-${index}`} className="inline-flex items-center gap-1.5">
+            {item.href ? (
+              <Link href={item.href} className="transition hover:text-[var(--foreground)]">
+                {item.label}
+              </Link>
+            ) : (
+              <span className="max-w-[24rem] truncate text-[var(--foreground)]/75">{item.label}</span>
+            )}
+            {index < breadcrumbs.length - 1 ? <ChevronRight className="h-3.5 w-3.5" /> : null}
+          </span>
+        ))}
+      </nav>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Badge className="rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.14em]">
+          <Link href={categoryHref}>{categoryLabel}</Link>
+        </Badge>
+        {secondaryBadge}
+      </div>
+      {metaItems.length ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[var(--muted-foreground)]">
+          {metaItems.map((item, index) => (
+            <span key={`${item.label}-${index}`} className="inline-flex items-center gap-1.5">
+              {item.icon}
+              <span>{item.label}</span>
+              {index < metaItems.length - 1 ? <span className="ml-1 text-slate-300">•</span> : null}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div className="space-y-3">
+        <h1 className="max-w-[930px] font-serif text-[2.15rem] leading-[1.04] tracking-[-0.015em] text-slate-950 sm:text-[2.6rem] lg:text-[2.95rem]">
+          {title}
+        </h1>
+        {summary ? (
+          <p className="max-w-[860px] text-[1.02rem] leading-[1.95] text-[var(--muted-foreground)] sm:text-[1.08rem]">
+            {summary}
+          </p>
+        ) : null}
+      </div>
+    </header>
+  );
 }
 
 function toPreviewRecommendationStory(story: NonNullable<Awaited<ReturnType<typeof getHomepageStoryBySlug>>>) {
@@ -271,7 +341,25 @@ export async function generateMetadata({
     ? resolvedExternalStory.category
     : resolvedArticle!.articleType;
   const sourceName = resolvedExternalStory ? formatPublisherName(resolvedExternalStory.sourceName) : siteConfig.name;
-  const image = resolvedExternalStory?.featuredImageUrl ?? resolvedArticle?.featuredImageUrl ?? null;
+  const image = resolvedExternalStory
+    ? resolveArticleHeroImage({
+        slug: resolvedExternalStory.slug,
+        category: resolvedExternalStory.category,
+        title: resolvedExternalStory.title,
+        summary: resolvedExternalStory.summary,
+        featuredImageUrl: resolvedExternalStory.featuredImageUrl,
+        featuredImageAlt: resolvedExternalStory.featuredImageAlt,
+      })
+    : resolvedArticle
+      ? resolveArticleHeroImage({
+          slug: resolvedArticle.slug,
+          category: resolvedArticle.articleType,
+          title: resolvedArticle.title,
+          summary: resolvedArticle.excerpt ?? "",
+          featuredImageUrl: resolvedArticle.featuredImageUrl,
+          featuredImageAlt: resolvedArticle.featuredImageAlt,
+        })
+      : null;
 
   return buildPageMetadata({
     title,
@@ -308,6 +396,14 @@ export default async function ArticlePage({
             categories: { include: { category: true } },
             tags: { include: { tag: true } },
             liveUpdates: { orderBy: { publishedAt: "desc" } },
+            media: {
+              select: {
+                url: true,
+                thumbnailUrl: true,
+                altText: true,
+              },
+              orderBy: { createdAt: "desc" },
+            },
           },
         }),
         getCurrentUser(),
@@ -358,11 +454,14 @@ export default async function ArticlePage({
     const categoryPath = getArticleCategoryPath(resolvedExternalStory.category);
     const leadText = resolvedExternalStory.content[0] ?? resolvedExternalStory.summary;
     const showLeadSection = shouldShowLeadSection(resolvedExternalStory.summary, leadText);
-    const imageSelection = resolveNewsImageSelection({
+    const imageSelection = resolveArticleImage({
       slug: resolvedExternalStory.slug,
       category: resolvedExternalStory.category,
       title: resolvedExternalStory.title,
       summary: resolvedExternalStory.summary,
+      featuredImageUrl: resolvedExternalStory.featuredImageUrl,
+      featuredImageAlt: resolvedExternalStory.featuredImageAlt,
+    }, {
       preferPremium: true,
       minimumScore: 28,
     });
@@ -371,7 +470,9 @@ export default async function ArticlePage({
       homepageStories,
       3,
     );
-    const usedRelatedImages: string[] = imageSelection.imageUrl ? [imageSelection.imageUrl] : [];
+    const usedRelatedImages: string[] = imageSelection.source === "fallback" && imageSelection.imageUrl
+      ? [imageSelection.imageUrl]
+      : [];
     const previewStructuredData = buildArticleStructuredData({
       title: resolvedExternalStory.title,
       description: resolvedExternalStory.summary,
@@ -393,21 +494,22 @@ export default async function ArticlePage({
       <main className="mx-auto max-w-[1480px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
         <StructuredDataScript data={previewStructuredData} />
         <article className="rounded-[32px] bg-white px-5 py-6 shadow-[0_18px_42px_rgba(15,23,42,0.05)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
-          <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-            <Link href="/">Home</Link>
-            <span>/</span>
-            <Link href={categoryPath}>{resolvedExternalStory.category}</Link>
-            <span>/</span>
-            <span>{resolvedExternalStory.title}</span>
-          </nav>
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge><Link href={categoryPath}>{resolvedExternalStory.category}</Link></Badge>
-            <Badge variant="neutral" className="px-2.5 py-1 text-[11px] tracking-[0.14em]">Syndicated report</Badge>
-              <div className="text-sm text-[var(--muted-foreground)]">{new Date(resolvedExternalStory.publishedAt).toLocaleString()}</div>
-          </div>
-          <h1 className="mt-4 max-w-[920px] font-serif text-[2.1rem] leading-[1.05] tracking-[-0.015em] text-slate-950 sm:text-[2.55rem] lg:text-[2.9rem]">
-            {resolvedExternalStory.title}
-          </h1>
+          <ArticleHeader
+            breadcrumbs={[
+              { label: "Home", href: "/" },
+              { label: resolvedExternalStory.category, href: categoryPath },
+              { label: resolvedExternalStory.title },
+            ]}
+            categoryLabel={resolvedExternalStory.category}
+            categoryHref={categoryPath}
+            secondaryBadge={<Badge variant="neutral" className="rounded-full px-3 py-1 text-[11px] tracking-[0.14em]">Syndicated report</Badge>}
+            metaItems={buildArticleHeaderMeta([
+              { icon: <Clock3 className="h-3.5 w-3.5" />, label: `${resolvedExternalStory.readingTimeMinutes} min read` },
+              { icon: <CalendarDays className="h-3.5 w-3.5" />, label: `Published ${formatPublishedDate(resolvedExternalStory.publishedAt)}` },
+            ])}
+            title={resolvedExternalStory.title}
+            summary={resolvedExternalStory.summary}
+          />
           <div className="mt-5 grid gap-3 rounded-[24px] border border-[var(--border)] bg-[var(--muted)]/28 px-4 py-4 sm:grid-cols-3 sm:px-5">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Desk</div>
@@ -422,10 +524,10 @@ export default async function ArticlePage({
               <div className="mt-1 text-sm text-[var(--foreground)]">{publisherName}</div>
             </div>
           </div>
-          {imageSelection.isStrongMatch && imageSelection.imageUrl ? (
+          {imageSelection.imageUrl ? (
             <ConditionalNewsImage
               src={imageSelection.imageUrl}
-              alt={resolvedExternalStory.featuredImageAlt ?? resolvedExternalStory.title}
+              alt={imageSelection.imageAlt ?? resolvedExternalStory.title}
               sizes="(max-width: 1024px) 100vw, 1040px"
               containerClassName="relative mt-7 h-[250px] overflow-hidden rounded-[28px] border border-black/6 bg-[var(--muted)] shadow-[0_18px_36px_rgba(15,23,42,0.08)] sm:h-[340px] lg:h-[430px] xl:max-w-[1040px]"
               imageClassName="object-cover object-center"
@@ -433,9 +535,6 @@ export default async function ArticlePage({
           ) : null}
           <div className="mt-7 grid gap-7 xl:grid-cols-[minmax(0,1.56fr)_minmax(260px,0.5fr)] xl:gap-9">
             <div className="space-y-5">
-              <p className="max-w-[860px] text-[1.02rem] leading-[1.95] text-[var(--muted-foreground)] sm:text-[1.08rem]">
-                {resolvedExternalStory.summary}
-              </p>
               {showLeadSection ? (
                 <div className="rounded-[22px] border border-[var(--border)] bg-[var(--muted)]/38 px-5 py-4 sm:px-6">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
@@ -506,20 +605,21 @@ export default async function ArticlePage({
           </div>
           <div className="grid gap-5 lg:grid-cols-3">
             {relatedStories.map((story) => {
-              const nextRelatedImage = resolveNewsImageSelection({
+              const nextRelatedImage = resolveArticleImage({
                 slug: story.slug,
                 category: story.category,
                 title: story.title,
                 summary: story.summary,
+                featuredImageUrl: story.featuredImageUrl,
+                featuredImageAlt: story.featuredImageAlt,
+              }, {
                 usedImages: usedRelatedImages,
                 preferPremium: true,
                 minimumScore: 28,
-              }).imageUrl;
-              const relatedImage = nextRelatedImage && !usedRelatedImages.includes(nextRelatedImage)
-                ? nextRelatedImage
-                : null;
+              });
+              const relatedImage = nextRelatedImage.imageUrl;
 
-              if (relatedImage) {
+              if (nextRelatedImage.source === "fallback" && relatedImage) {
                 usedRelatedImages.push(relatedImage);
               }
 
@@ -533,7 +633,7 @@ export default async function ArticlePage({
                   summary={story.summary}
                   publishedLabel={formatRelatedTimestamp(story.publishedAt)}
                   imageUrl={relatedImage}
-                  imageAlt={story.featuredImageAlt ?? story.title}
+                  imageAlt={nextRelatedImage.imageAlt ?? story.title}
                 />
               );
             })}
@@ -571,6 +671,14 @@ export default async function ArticlePage({
           include: {
             edition: true,
             categories: { include: { category: true } },
+            media: {
+              select: {
+                url: true,
+                thumbnailUrl: true,
+                altText: true,
+              },
+              orderBy: { createdAt: "desc" },
+            },
           },
           orderBy: { publishedAt: "desc" },
           take: 3,
@@ -589,6 +697,14 @@ export default async function ArticlePage({
           include: {
             edition: true,
             categories: { include: { category: true } },
+            media: {
+              select: {
+                url: true,
+                thumbnailUrl: true,
+                altText: true,
+              },
+              orderBy: { createdAt: "desc" },
+            },
           },
           orderBy: { publishedAt: "desc" },
           take: 3,
@@ -612,14 +728,19 @@ export default async function ArticlePage({
     }).catch(() => null);
   }
 
-  const heroImage = resolveArticleHeroImage({
+  const heroImage = resolveArticleImage({
     slug: articleRecord.slug,
     category: articleRecord.categories[0]?.category.name ?? articleRecord.articleType,
     title: articleRecord.title,
     summary: articleRecord.excerpt ?? "",
     featuredImageUrl: articleRecord.featuredImageUrl,
+    featuredImageAlt: articleRecord.featuredImageAlt,
+    media: "media" in articleRecord ? articleRecord.media ?? [] : [],
+  }, {
+    preferPremium: true,
+    minimumScore: 28,
   });
-  const categoryName = articleRecord.categories[0]?.category.name ?? "Articles";
+  const categoryName = articleRecord.categories[0]?.category.name ?? getArticleDeskName(null, articleRecord.articleType);
   const categoryPath = getArticleCategoryPath(articleRecord.categories[0]?.category.slug ?? categoryName);
   const structuredData = buildArticleStructuredData({
     title: articleRecord.title,
@@ -628,7 +749,7 @@ export default async function ArticlePage({
     publishedTime: articleRecord.publishedAt?.toISOString(),
     modifiedTime: (articleRecord.updatedOn ?? articleRecord.updatedAt).toISOString(),
     section: categoryName,
-    image: heroImage,
+    image: heroImage.imageUrl,
     authorName: articleRecord.author?.name ?? getArticleDeskName(categoryName, articleRecord.articleType),
     breadcrumbs: [
       { name: "Home", url: absoluteUrl("/") },
@@ -649,6 +770,8 @@ export default async function ArticlePage({
       href: `/articles/${item.slug}`,
       isExternal: false,
       featuredImageAlt: null,
+      featuredImageUrl: "featuredImageUrl" in item ? item.featuredImageUrl ?? null : null,
+      media: "media" in item ? item.media ?? [] : [],
     })),
     ...relatedArticles.map((item) => ({
       id: item.id,
@@ -661,6 +784,8 @@ export default async function ArticlePage({
       href: `/articles/${item.slug}`,
       isExternal: false,
       featuredImageAlt: null,
+      featuredImageUrl: "featuredImageUrl" in item ? item.featuredImageUrl ?? null : null,
+      media: "media" in item ? item.media ?? [] : [],
     })),
     ...homepageStories,
   ];
@@ -669,48 +794,40 @@ export default async function ArticlePage({
     relatedCandidates,
     3,
   );
-  const usedRelatedImages: string[] = heroImage ? [heroImage] : [];
+  const usedRelatedImages: string[] = heroImage.source === "fallback" && heroImage.imageUrl ? [heroImage.imageUrl] : [];
 
   return (
     <main className="mx-auto max-w-[1480px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
       <StructuredDataScript data={structuredData} />
       <div className="grid gap-7 xl:grid-cols-[minmax(0,1.56fr)_minmax(280px,0.48fr)] xl:gap-10">
         <article>
-          <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-            <Link href="/">Home</Link>
-            <span>/</span>
-            <Link href={categoryPath}>{categoryName}</Link>
-            <span>/</span>
-            <span>{articleRecord.title}</span>
-          </nav>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Badge><Link href={categoryPath}>{categoryName}</Link></Badge>
-            {articleRecord.accessTier !== "FREE" ? (
-              <Badge variant="neutral" className="px-2.5 py-1 text-[11px] tracking-[0.14em]"><Crown className="mr-1 h-3.5 w-3.5" /> Premium</Badge>
-            ) : null}
-            <div className="flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]">
-              <Clock3 className="h-3.5 w-3.5" />
-              {articleRecord.readingTimeMinutes} min read
-            </div>
-            <div className="text-sm text-[var(--muted-foreground)]">
-              Published {formatPublishedDate(articleRecord.publishedAt ?? articleRecord.updatedAt)}
-            </div>
-          </div>
+          <ArticleHeader
+            breadcrumbs={[
+              { label: "Home", href: "/" },
+              { label: categoryName, href: categoryPath },
+              { label: articleRecord.title },
+            ]}
+            categoryLabel={categoryName}
+            categoryHref={categoryPath}
+            secondaryBadge={articleRecord.accessTier !== "FREE"
+              ? <Badge variant="neutral" className="rounded-full px-3 py-1 text-[11px] tracking-[0.14em]"><Crown className="mr-1 h-3.5 w-3.5" /> Premium</Badge>
+              : undefined}
+            metaItems={buildArticleHeaderMeta([
+              { icon: <Clock3 className="h-3.5 w-3.5" />, label: `${articleRecord.readingTimeMinutes} min read` },
+              { icon: <CalendarDays className="h-3.5 w-3.5" />, label: `Published ${formatPublishedDate(articleRecord.publishedAt ?? articleRecord.updatedAt)}` },
+            ])}
+            title={articleRecord.title}
+            summary={articleRecord.excerpt ?? "Enterprise publishing requires editorial authority, regional targeting, monetization strategy, and platform-grade delivery in the same system."}
+          />
           {!access.allowed ? (
             <div className="mt-6 rounded-[24px] border border-[var(--accent)] bg-[var(--accent-soft)] p-5 text-sm">
               You are reading a metered preview. Subscribe to continue with premium reporting.
             </div>
           ) : null}
-          <h1 className="mt-4 max-w-[930px] font-serif text-[2.15rem] leading-[1.04] tracking-[-0.015em] text-slate-950 sm:text-[2.6rem] lg:text-[2.95rem]">
-            {articleRecord.title}
-          </h1>
-          <p className="mt-3.5 max-w-[860px] text-[1.02rem] leading-[1.95] text-[var(--muted-foreground)] sm:text-[1.08rem]">
-            {articleRecord.excerpt ?? "Enterprise publishing requires editorial authority, regional targeting, monetization strategy, and platform-grade delivery in the same system."}
-          </p>
-          {heroImage ? (
+          {heroImage.imageUrl ? (
             <ConditionalNewsImage
-              src={heroImage}
-              alt={articleRecord.featuredImageAlt ?? articleRecord.title}
+              src={heroImage.imageUrl}
+              alt={heroImage.imageAlt ?? articleRecord.title}
               sizes="(max-width: 1024px) 100vw, 1040px"
               containerClassName="relative mt-7 h-[250px] overflow-hidden rounded-[28px] border border-black/6 bg-[var(--muted)] shadow-[0_18px_36px_rgba(15,23,42,0.08)] sm:h-[340px] lg:h-[430px] xl:max-w-[1040px]"
               imageClassName="object-cover object-center"
@@ -772,21 +889,23 @@ export default async function ArticlePage({
           </div>
         </div>
         <div className="grid gap-5 lg:grid-cols-3">
-            {relatedStories.map((story) => {
-            const nextRelatedImage = resolveNewsImageSelection({
+          {relatedStories.map((story) => {
+            const nextRelatedImage = resolveArticleImage({
               slug: story.slug,
               category: story.category,
               title: story.title,
               summary: story.summary,
+              featuredImageUrl: "featuredImageUrl" in story ? story.featuredImageUrl ?? null : null,
+              featuredImageAlt: story.featuredImageAlt,
+              media: "media" in story ? story.media ?? [] : [],
+            }, {
               usedImages: usedRelatedImages,
               preferPremium: true,
               minimumScore: 28,
-            }).imageUrl;
-            const relatedImage = nextRelatedImage && !usedRelatedImages.includes(nextRelatedImage)
-              ? nextRelatedImage
-              : null;
+            });
+            const relatedImage = nextRelatedImage.imageUrl;
 
-            if (relatedImage) {
+            if (nextRelatedImage.source === "fallback" && relatedImage) {
               usedRelatedImages.push(relatedImage);
             }
 
@@ -800,7 +919,7 @@ export default async function ArticlePage({
                 summary={story.summary || "Read the next VANTERENPRESS report connected to this developing story."}
                 publishedLabel={formatRelatedTimestamp(story.publishedAt)}
                 imageUrl={relatedImage}
-                imageAlt={story.featuredImageAlt ?? story.title}
+                imageAlt={nextRelatedImage.imageAlt ?? story.title}
               />
             );
           })}

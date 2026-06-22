@@ -176,6 +176,14 @@ async function getHomepageHeroOverrides() {
     edition: { select: { name: true, region: true } },
     categories: { include: { category: { select: { name: true } } } },
     tags: { include: { tag: { select: { name: true } } } },
+    media: {
+      select: {
+        url: true,
+        thumbnailUrl: true,
+        altText: true,
+      },
+      orderBy: { createdAt: "desc" as const },
+    },
   } as const;
 
   try {

@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { resolveArticleImage } from "@/lib/article-rendering";
 import type { EditorialStory, HomepageNewsBundle } from "@/lib/news-providers/types";
 import { siteConfig } from "@/lib/site";
 
@@ -12,6 +13,7 @@ type HomepageHeroArticle = {
   body: Prisma.JsonValue;
   featuredImageUrl: string | null;
   featuredImageAlt: string | null;
+  media?: Array<{ url: string; thumbnailUrl: string | null; altText: string | null }>;
   publishedAt: Date | null;
   updatedAt: Date;
   readingTimeMinutes: number;
@@ -61,6 +63,15 @@ export function toEditorialStoryFromArticle(article: HomepageHeroArticle): Edito
   const category = article.categories[0]?.category.name ?? article.articleType;
   const summary = article.excerpt?.trim() || article.title;
   const content = summarizeBody(article.body);
+  const image = resolveArticleImage({
+    slug: article.slug,
+    category,
+    title: article.title,
+    summary,
+    featuredImageUrl: article.featuredImageUrl,
+    featuredImageAlt: article.featuredImageAlt,
+    media: article.media,
+  });
 
   return {
     id: article.id,
@@ -72,8 +83,8 @@ export function toEditorialStoryFromArticle(article: HomepageHeroArticle): Edito
     region: article.edition.region,
     summary,
     content: content.length ? content : [summary],
-    featuredImageUrl: article.featuredImageUrl,
-    featuredImageAlt: article.featuredImageAlt ?? article.title,
+    featuredImageUrl: image.imageUrl,
+    featuredImageAlt: image.imageAlt ?? article.title,
     author: {
       name: article.author.name ?? article.author.email ?? siteConfig.name,
       role: `${siteConfig.name} newsroom`,

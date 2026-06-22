@@ -57,6 +57,14 @@ class PostgresSearchAdapter implements SearchAdapter {
         edition: true,
         categories: { include: { category: true } },
         tags: { include: { tag: true } },
+        media: {
+          select: {
+            url: true,
+            thumbnailUrl: true,
+            altText: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
   }
@@ -85,6 +93,14 @@ export async function syncArticleSearchDocument(articleId: string) {
       edition: true,
       categories: { include: { category: true } },
       tags: { include: { tag: true } },
+      media: {
+        select: {
+          url: true,
+          thumbnailUrl: true,
+          altText: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
