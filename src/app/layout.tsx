@@ -56,6 +56,9 @@ export function generateMetadata(): Metadata {
       description: siteConfig.description,
       images: [`${siteConfig.url}/opengraph-image`],
     },
+    verification: {
+      google: process.env.GOOGLE_SITE_VERIFICATION,
+    },
   };
 }
 

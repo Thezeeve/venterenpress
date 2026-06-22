@@ -25,10 +25,11 @@ export function SiteFooter({ brand }: { brand: BrandConfig }) {
           <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">News</div>
           <div className="grid gap-2.5 text-sm">
             <Link href="/latest">Latest News</Link>
-            <Link href="/search?category=world-news">World</Link>
-            <Link href="/search?category=business">Business</Link>
-            <Link href="/search?category=technology">Technology</Link>
-            <Link href="/search?category=sports">Sports</Link>
+            <Link href="/world">World</Link>
+            <Link href="/politics">Politics</Link>
+            <Link href="/technology">Technology</Link>
+            <Link href="/crypto">Crypto</Link>
+            <Link href="/sports">Sports</Link>
           </div>
         </div>
 

@@ -116,6 +116,60 @@ export function buildWebsiteSchema() {
           url: logoUrl,
         },
       },
+      {
+        "@type": "NewsMediaOrganization",
+        "@id": `${siteConfig.url}/#newsmediaorganization`,
+        name: organizationName,
+        url: siteConfig.url,
+        logo: {
+          "@type": "ImageObject",
+          url: logoUrl,
+        },
+        publishingPrinciples: absoluteUrl("/editorial-standards"),
+        ethicsPolicy: absoluteUrl("/ethics"),
+        correctionsPolicy: absoluteUrl("/corrections"),
+        contactPoint: [
+          {
+            "@type": "ContactPoint",
+            contactType: "customer support",
+            url: absoluteUrl("/contact"),
+          },
+          {
+            "@type": "ContactPoint",
+            contactType: "news tips",
+            url: absoluteUrl("/contact"),
+          },
+        ],
+        parentOrganization: {
+          "@id": `${siteConfig.url}/#organization`,
+        },
+      },
+    ],
+  };
+}
+
+export function buildWebPageStructuredData(input: {
+  title: string;
+  description: string;
+  url: string;
+  breadcrumbs: BreadcrumbItem[];
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        name: input.title,
+        description: input.description,
+        url: input.url,
+        isPartOf: {
+          "@id": `${siteConfig.url}/#website`,
+        },
+        about: {
+          "@id": `${siteConfig.url}/#newsmediaorganization`,
+        },
+      },
+      buildBreadcrumbList(input.breadcrumbs),
     ],
   };
 }

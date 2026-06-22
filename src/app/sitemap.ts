@@ -7,6 +7,9 @@ import { siteConfig } from "@/lib/site";
 
 const publicSectionUrls = [
   siteConfig.url,
+  `${siteConfig.url}/latest`,
+  `${siteConfig.url}/about`,
+  `${siteConfig.url}/contact`,
   ...Object.values(PUBLIC_CATEGORY_CONFIG).map((item) => `${siteConfig.url}${item.href}`),
   ...Object.values(PUBLIC_TOPIC_CONFIG).map((item) => `${siteConfig.url}${item.href}`),
 ];

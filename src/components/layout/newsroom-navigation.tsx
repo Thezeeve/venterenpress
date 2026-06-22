@@ -111,6 +111,8 @@ export function NewsroomNavigation({ notifications, isLoggedIn, navItems }: NavP
     () => [
       ...navItems,
       { label: "Latest News", href: "/latest" },
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
       { label: "Most Read", href: "/most-read" },
     ],
     [navItems],

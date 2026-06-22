@@ -438,10 +438,12 @@ function TopStoryCard({ story }: { story: SectionStory }) {
 
 function SectionPanel({
   title,
+  href,
   featured,
   stories,
 }: {
   title: string;
+  href: string;
   featured: SectionStory;
   stories: SectionStory[];
 }) {
@@ -458,7 +460,7 @@ function SectionPanel({
           <span className="h-5 w-1 rounded-full bg-[#D8261D]" />
           <h2 className="text-lg font-semibold uppercase tracking-[0.06em]">{title}</h2>
         </div>
-        <Link href="/latest" className="text-sm text-[var(--accent)] underline underline-offset-4">
+        <Link href={href} className="text-sm text-[var(--accent)] underline underline-offset-4">
           View all
         </Link>
       </div>
@@ -631,19 +633,20 @@ export function HomepageClient({
   );
 
   const sectionPanels = [
-    { title: "World News", stories: takeUniqueStories(bundle.worldNews, renderedStoryIds, 3) },
-    { title: "Business", stories: takeUniqueStories(bundle.businessNews, renderedStoryIds, 3) },
-    { title: "Technology", stories: takeUniqueStories(bundle.technologyNews, renderedStoryIds, 3) },
-    { title: "Sports", stories: takeUniqueStories(bundle.sportsNews, renderedStoryIds, 3) },
+    { title: "World News", href: "/world", stories: takeUniqueStories(bundle.worldNews, renderedStoryIds, 3) },
+    { title: "Business", href: "/business", stories: takeUniqueStories(bundle.businessNews, renderedStoryIds, 3) },
+    { title: "Technology", href: "/technology", stories: takeUniqueStories(bundle.technologyNews, renderedStoryIds, 3) },
+    { title: "Sports", href: "/sports", stories: takeUniqueStories(bundle.sportsNews, renderedStoryIds, 3) },
   ]
     .map((panel) => ({
       title: panel.title,
+      href: panel.href,
       featured: panel.stories[0]
         ? toSectionStory(panel.stories[0], assignHomepageStoryImage(panel.stories[0]))
         : null,
       stories: panel.stories.slice(1, 3).map((article) => toSectionStory(article, assignHomepageStoryImage(article))),
     }))
-    .filter((panel): panel is { title: string; featured: SectionStory; stories: SectionStory[] } => Boolean(panel.featured));
+    .filter((panel): panel is { title: string; href: string; featured: SectionStory; stories: SectionStory[] } => Boolean(panel.featured));
   const liveStories = takeUniqueStories(bundle.liveCoverage, renderedStoryIds, 3);
   const liveLeadStory = liveStories[0] ?? null;
   const liveLeadImage = liveLeadStory ? assignHomepageStoryImage(liveLeadStory, { preferPremium: true }) : null;
@@ -729,6 +732,7 @@ export function HomepageClient({
             <SectionPanel
               key={panel.title}
               title={panel.title}
+              href={panel.href}
               featured={panel.featured}
               stories={panel.stories}
             />
