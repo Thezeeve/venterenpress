@@ -23,6 +23,10 @@ describe("article editor helpers", () => {
         seoDescription: "",
         featuredImageUrl: "",
         featuredImageAlt: "",
+        showOnHero: false,
+        heroStartAt: "",
+        heroEndAt: "",
+        heroPriority: "",
       },
       "<p></p>",
     );
@@ -70,6 +74,10 @@ describe("article editor helpers", () => {
         seoDescription: "A briefing on AI infrastructure competition.",
         featuredImageUrl: "https://example.com/image.jpg",
         featuredImageAlt: "Data center exterior",
+        showOnHero: true,
+        heroStartAt: "2026-06-23T09:00",
+        heroEndAt: "2026-06-24T09:00",
+        heroPriority: "3",
       },
       "<p>Lead paragraph.</p>",
       "publish",
@@ -82,6 +90,8 @@ describe("article editor helpers", () => {
       type: "doc",
       content: [{ type: "paragraph", text: "Lead paragraph." }],
     });
+    expect(payload.showOnHero).toBe(true);
+    expect(payload.heroPriority).toBe(3);
   });
 
   it("serializes stored article body back into editor html", () => {
@@ -117,6 +127,10 @@ describe("article editor helpers", () => {
       seoDescription: "",
       featuredImageUrl: "",
       featuredImageAlt: "",
+      showOnHero: false,
+      heroStartAt: "",
+      heroEndAt: "",
+      heroPriority: "",
     }, "<p></p>")).toEqual([
       "Title required.",
       "Slug required.",

@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { isDatabaseAvailable } from "@/lib/database-availability";
 import { resolveArticleHeroImage, resolveArticleImage, selectArticlePageSource } from "@/lib/article-rendering";
+import { getArticleBySlug, normalizeArticleRouteSlug } from "@/lib/articles";
 import { getHomepageNewsResponse, getHomepageStoryBySlug } from "@/lib/news-providers";
 import { getSeedStoryBySlug, seededEditorialStories } from "@/lib/news-providers/seed-content";
 import {
@@ -202,7 +203,7 @@ function toInternalRecommendationStory(article: {
 }
 
 function getDemoArticle(slug: string) {
-  const story = getSeedStoryBySlug(slug);
+  const story = getSeedStoryBySlug(normalizeArticleRouteSlug(slug));
   if (!story) {
     return null;
   }
@@ -262,6 +263,45 @@ function getDemoArticle(slug: string) {
   };
 }
 
+const publicArticleInclude = {
+  author: true,
+  edition: true,
+  categories: { include: { category: true } },
+  tags: { include: { tag: true } },
+  liveUpdates: { orderBy: { publishedAt: "desc" as const } },
+  media: {
+    select: {
+      url: true,
+      thumbnailUrl: true,
+      altText: true,
+    },
+    orderBy: { createdAt: "desc" as const },
+  },
+} as const;
+
+async function findFullDatabaseArticleByRouteSlug(slug: string) {
+  const exactSlug = slug.trim();
+  const normalizedSlug = normalizeArticleRouteSlug(slug);
+
+  const exactMatch = await prisma.article.findUnique({
+    where: { slug: exactSlug },
+    include: publicArticleInclude,
+  });
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  if (!normalizedSlug || normalizedSlug === exactSlug) {
+    return null;
+  }
+
+  return prisma.article.findUnique({
+    where: { slug: normalizedSlug },
+    include: publicArticleInclude,
+  });
+}
+
 function getDemoArticleSidebar(slug: string) {
   const seedRelated = seededEditorialStories
     .filter((story) => story.slug !== slug)
@@ -306,19 +346,20 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  const normalizedSlug = normalizeArticleRouteSlug(slug);
   const databaseAvailable = await isDatabaseAvailable();
   const article = await (async () => {
     if (!databaseAvailable) {
-      return getDemoArticle(slug);
+      return getDemoArticle(normalizedSlug);
     }
 
     try {
-      return (await prisma.article.findUnique({ where: { slug } })) ?? getDemoArticle(slug);
+      return (await getArticleBySlug(slug)) ?? getDemoArticle(normalizedSlug);
     } catch {
-      return getDemoArticle(slug);
+      return getDemoArticle(normalizedSlug);
     }
   })();
-  const externalStory = article ? null : await getExternalPreviewStory(slug);
+  const externalStory = article ? null : await getExternalPreviewStory(normalizedSlug);
 
   if (!article && !externalStory) {
     return {};
@@ -380,32 +421,16 @@ export default async function ArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const normalizedSlug = normalizeArticleRouteSlug(slug);
   const databaseAvailable = await isDatabaseAvailable();
   const [dbArticle, user, externalStory] = await (async () => {
     if (!databaseAvailable) {
-      return [getDemoArticle(slug), null, null] as const;
+      return [getDemoArticle(normalizedSlug), null, null] as const;
     }
 
     try {
       const [article, currentUser] = await Promise.all([
-        prisma.article.findUnique({
-          where: { slug },
-          include: {
-            author: true,
-            edition: true,
-            categories: { include: { category: true } },
-            tags: { include: { tag: true } },
-            liveUpdates: { orderBy: { publishedAt: "desc" } },
-            media: {
-              select: {
-                url: true,
-                thumbnailUrl: true,
-                altText: true,
-              },
-              orderBy: { createdAt: "desc" },
-            },
-          },
-        }),
+        findFullDatabaseArticleByRouteSlug(slug),
         getCurrentUser(),
       ] as const);
 
@@ -413,9 +438,9 @@ export default async function ArticlePage({
         return [article, currentUser, null] as const;
       }
 
-      return [getDemoArticle(slug), currentUser, await getExternalPreviewStory(slug)] as const;
+      return [null, currentUser, await getExternalPreviewStory(normalizedSlug)] as const;
     } catch {
-      return [getDemoArticle(slug), null, null] as const;
+      return [getDemoArticle(normalizedSlug), null, null] as const;
     }
   })();
   const source = selectArticlePageSource({

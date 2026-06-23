@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeSlug } from "@/lib/utils";
 
 const otpSchema = z
   .union([z.string().trim().length(6), z.literal("")])
@@ -25,7 +26,7 @@ export const articleStatusSchema = z.enum([
 
 export const articleInputSchema = z.object({
   title: z.string().min(10).max(180),
-  slug: z.string().min(3).max(200),
+  slug: z.string().min(3).max(200).transform((value) => normalizeSlug(value)),
   dek: z.string().max(220).optional().or(z.literal("")),
   excerpt: z.string().min(20).max(420),
   premiumPreview: z.string().max(500).optional(),
@@ -57,6 +58,10 @@ export const articleInputSchema = z.object({
   featuredImageAlt: z.string().max(200).optional().or(z.literal("")),
   videoUrl: z.string().url().optional().or(z.literal("")),
   audioUrl: z.string().url().optional().or(z.literal("")),
+  showOnHero: z.boolean().default(false),
+  heroStartAt: z.string().datetime().optional().nullable(),
+  heroEndAt: z.string().datetime().optional().nullable(),
+  heroPriority: z.number().int().optional().nullable(),
 });
 
 export const articleWorkflowActionSchema = z.object({

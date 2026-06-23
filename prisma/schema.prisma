@@ -420,6 +420,10 @@ model Article {
   accessTier           AccessTier          @default(FREE)
   featured             Boolean             @default(false)
   breaking             Boolean             @default(false)
+  showOnHero           Boolean             @default(false)
+  heroStartAt          DateTime?
+  heroEndAt            DateTime?
+  heroPriority         Int?
   allowComments        Boolean             @default(true)
   scheduledFor         DateTime?
   submittedAt          DateTime?
@@ -466,6 +470,7 @@ model Article {
   @@index([editionId, publishedAt])
   @@index([articleType, status])
   @@index([deletedAt])
+  @@index([showOnHero, heroStartAt, heroEndAt, heroPriority, publishedAt])
 }
 
 model ArticleCategory {

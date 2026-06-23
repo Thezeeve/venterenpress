@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyHomepageHeroSelection, toEditorialStoryFromArticle } from "@/lib/homepage-hero";
+import {
+  applyHomepageHeroSelection,
+  isHeroWindowActive,
+  selectActiveHomepageHeroArticles,
+  toEditorialStoryFromArticle,
+} from "@/lib/homepage-hero";
 import { getSeedHomepageBundle } from "@/lib/news-providers/seed-content";
 
 describe("homepage hero selection", () => {
@@ -74,5 +79,44 @@ describe("homepage hero selection", () => {
 
     expect(updated.topStories[0]?.id).toBe("cms-2");
     expect(updated.topStories[1]?.id).toBe("cms-3");
+  });
+
+  it("filters expired hero articles while keeping non-expired ones available for hero selection", () => {
+    const now = new Date("2026-06-23T12:00:00.000Z");
+    const activeHeroes = selectActiveHomepageHeroArticles([
+      { id: "active", showOnHero: true, heroStartAt: "2026-06-23T10:00:00.000Z", heroEndAt: "2026-06-23T14:00:00.000Z" },
+      { id: "expired", showOnHero: true, heroStartAt: "2026-06-22T10:00:00.000Z", heroEndAt: "2026-06-23T11:59:59.000Z" },
+      { id: "scheduled", showOnHero: true, heroStartAt: "2026-06-23T12:30:00.000Z", heroEndAt: null },
+    ], now);
+
+    expect(activeHeroes.map((article) => article.id)).toEqual(["active"]);
+    expect(isHeroWindowActive({
+      showOnHero: true,
+      heroStartAt: "2026-06-22T10:00:00.000Z",
+      heroEndAt: "2026-06-23T11:59:59.000Z",
+    }, now)).toBe(false);
+  });
+
+  it("caps the active hero list at seven articles", () => {
+    const activeHeroes = selectActiveHomepageHeroArticles(
+      Array.from({ length: 8 }, (_, index) => ({
+        id: `hero-${index + 1}`,
+        showOnHero: true,
+        heroStartAt: "2026-06-23T08:00:00.000Z",
+        heroEndAt: null,
+      })),
+      new Date("2026-06-23T12:00:00.000Z"),
+    );
+
+    expect(activeHeroes).toHaveLength(7);
+    expect(activeHeroes.map((article) => article.id)).toEqual([
+      "hero-1",
+      "hero-2",
+      "hero-3",
+      "hero-4",
+      "hero-5",
+      "hero-6",
+      "hero-7",
+    ]);
   });
 });

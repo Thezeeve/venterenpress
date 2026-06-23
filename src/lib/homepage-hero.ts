@@ -4,6 +4,7 @@ import type { EditorialStory, HomepageNewsBundle } from "@/lib/news-providers/ty
 import { siteConfig } from "@/lib/site";
 
 export const HOMEPAGE_HERO_ARTICLE_KEY = "homepage.heroArticleId";
+export const HOMEPAGE_HERO_MAX_ITEMS = 7;
 
 type HomepageHeroArticle = {
   id: string;
@@ -28,7 +29,42 @@ type HomepageHeroArticle = {
   };
   categories: Array<{ category: { name: string } }>;
   tags: Array<{ tag: { name: string } }>;
+  showOnHero?: boolean;
+  heroStartAt?: Date | null;
+  heroEndAt?: Date | null;
+  heroPriority?: number | null;
 };
+
+export function isHeroWindowActive(article: {
+  showOnHero?: boolean | null;
+  heroStartAt?: Date | string | null;
+  heroEndAt?: Date | string | null;
+}, now = new Date()) {
+  if (!article.showOnHero) {
+    return false;
+  }
+
+  const startAt = article.heroStartAt ? new Date(article.heroStartAt) : null;
+  const endAt = article.heroEndAt ? new Date(article.heroEndAt) : null;
+
+  if (startAt && startAt.getTime() > now.getTime()) {
+    return false;
+  }
+
+  if (endAt && endAt.getTime() <= now.getTime()) {
+    return false;
+  }
+
+  return true;
+}
+
+export function selectActiveHomepageHeroArticles<T extends {
+  showOnHero?: boolean | null;
+  heroStartAt?: Date | string | null;
+  heroEndAt?: Date | string | null;
+}>(articles: readonly T[], now = new Date()) {
+  return articles.filter((article) => isHeroWindowActive(article, now)).slice(0, HOMEPAGE_HERO_MAX_ITEMS);
+}
 
 function isSameStory(left: Pick<EditorialStory, "id" | "slug" | "href">, right: Pick<EditorialStory, "id" | "slug" | "href">) {
   return left.id === right.id || left.slug === right.slug || left.href === right.href;

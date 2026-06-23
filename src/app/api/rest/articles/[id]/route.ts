@@ -13,6 +13,7 @@ function revalidateArticlePaths(input: {
   const paths = new Set<string>([
     "/",
     "/latest",
+    "/most-read",
     "/search",
     "/categories",
     "/topics",

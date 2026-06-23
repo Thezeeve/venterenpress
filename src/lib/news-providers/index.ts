@@ -1,5 +1,10 @@
 import { isDatabaseAvailable } from "@/lib/database-availability";
-import { HOMEPAGE_HERO_ARTICLE_KEY, applyHomepageHeroSelection, toEditorialStoryFromArticle } from "@/lib/homepage-hero";
+import {
+  applyHomepageHeroSelection,
+  HOMEPAGE_HERO_MAX_ITEMS,
+  selectActiveHomepageHeroArticles,
+  toEditorialStoryFromArticle,
+} from "@/lib/homepage-hero";
 import { prisma } from "@/lib/prisma";
 import { CurrentsNewsProvider } from "@/lib/news-providers/currents-provider";
 import { FinanceNewsProvider } from "@/lib/news-providers/finance-provider";
@@ -23,6 +28,7 @@ import type {
   NewsProvider,
   ProviderRuntimeStatus,
 } from "@/lib/news-providers/types";
+import { normalizeSlug } from "@/lib/utils";
 
 export const HOMEPAGE_NEWS_STATE_KEY = "news.homepage.snapshot";
 const DEFAULT_REFRESH_INTERVAL_MINUTES = 15;
@@ -187,30 +193,22 @@ async function getHomepageHeroOverrides() {
   } as const;
 
   try {
-    const setting = await prisma.siteSetting.findUnique({
-      where: { key: HOMEPAGE_HERO_ARTICLE_KEY },
-    });
-    const manualHeroArticleId = setting?.value && typeof setting.value === "object" && "articleId" in setting.value && typeof setting.value.articleId === "string"
-      ? setting.value.articleId
-      : null;
-
-    const [manualHeroArticle, fallbackHeroArticle, carouselArticles, visibleCmsArticles] = await Promise.all([
-      manualHeroArticleId
-        ? prisma.article.findFirst({
-            where: { id: manualHeroArticleId, status: "PUBLISHED", deletedAt: null },
-            include: articleInclude,
-          })
-        : Promise.resolve(null),
+    const [fallbackHeroArticle, carouselArticles, visibleCmsArticles] = await Promise.all([
       prisma.article.findFirst({
         where: { status: "PUBLISHED", deletedAt: null },
         include: articleInclude,
         orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
       }),
       prisma.article.findMany({
-        where: { status: "PUBLISHED", deletedAt: null },
+        where: { status: "PUBLISHED", deletedAt: null, showOnHero: true },
         include: articleInclude,
-        orderBy: [{ featured: "desc" }, { publishedAt: "desc" }, { updatedAt: "desc" }],
-        take: 5,
+        orderBy: [
+          { heroPriority: "desc" },
+          { heroStartAt: "asc" },
+          { publishedAt: "desc" },
+          { updatedAt: "desc" },
+        ],
+        take: HOMEPAGE_HERO_MAX_ITEMS * 3,
       }),
       prisma.article.findMany({
         where: { status: "PUBLISHED", deletedAt: null },
@@ -218,14 +216,14 @@ async function getHomepageHeroOverrides() {
       }),
     ]);
 
+    const activeHeroArticles = selectActiveHomepageHeroArticles(carouselArticles);
+
+    const manualHeroArticle = activeHeroArticles[0] ?? null;
+
     return {
       manualHero: manualHeroArticle ? toEditorialStoryFromArticle(manualHeroArticle) : null,
       fallbackHero: fallbackHeroArticle ? toEditorialStoryFromArticle(fallbackHeroArticle) : null,
-      heroCarouselStories: [
-        manualHeroArticle ? toEditorialStoryFromArticle(manualHeroArticle) : null,
-        fallbackHeroArticle ? toEditorialStoryFromArticle(fallbackHeroArticle) : null,
-        ...carouselArticles.map(toEditorialStoryFromArticle),
-      ].filter((story): story is EditorialStory => Boolean(story)),
+      heroCarouselStories: activeHeroArticles.map(toEditorialStoryFromArticle),
       visibleCmsStoryIds: new Set(visibleCmsArticles.map((article) => article.id)),
     };
   } catch {
@@ -706,11 +704,12 @@ export async function getHomepageNewsBundle(): Promise<HomepageNewsBundle> {
 
 export async function getHomepageStoryBySlug(slug: string): Promise<EditorialStory | null> {
   const response = await getHomepageNewsResponse();
-  const liveOrSeedStory = flattenBundleStories(response.bundle).find((story) => story.slug === slug);
+  const normalizedSlug = normalizeSlug(slug);
+  const liveOrSeedStory = flattenBundleStories(response.bundle).find((story) => story.slug === slug || story.slug === normalizedSlug);
 
   if (liveOrSeedStory) {
     return liveOrSeedStory;
   }
 
-  return getSeedStoryBySlug(slug);
+  return getSeedStoryBySlug(normalizedSlug);
 }

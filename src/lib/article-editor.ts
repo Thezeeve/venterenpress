@@ -1,4 +1,4 @@
-import { slugify } from "@/lib/utils";
+import { normalizeSlug, slugify } from "@/lib/utils";
 
 export type EditorFormValues = {
   title: string;
@@ -11,6 +11,10 @@ export type EditorFormValues = {
   seoDescription: string;
   featuredImageUrl: string;
   featuredImageAlt: string;
+  showOnHero: boolean;
+  heroStartAt: string;
+  heroEndAt: string;
+  heroPriority: string;
 };
 
 export type EditorSubmitIntent = "draft" | "publish";
@@ -229,9 +233,11 @@ export function validateEditorIssues(values: EditorFormValues, bodyHtml: string)
 }
 
 export function buildArticlePayload(values: EditorFormValues, bodyHtml: string, intent: EditorSubmitIntent) {
+  const normalizedSlug = normalizeSlug(values.slug.trim() || values.title);
+
   return {
     title: values.title.trim(),
-    slug: values.slug.trim() || slugify(values.title),
+    slug: normalizedSlug || slugify(values.title),
     dek: "",
     excerpt: values.excerpt.trim(),
     body: htmlToArticleBody(bodyHtml),
@@ -250,6 +256,10 @@ export function buildArticlePayload(values: EditorFormValues, bodyHtml: string, 
     featuredImageAlt: values.featuredImageAlt.trim(),
     videoUrl: "",
     audioUrl: "",
+    showOnHero: values.showOnHero,
+    heroStartAt: values.heroStartAt.trim() || null,
+    heroEndAt: values.heroEndAt.trim() || null,
+    heroPriority: values.heroPriority.trim() ? Number.parseInt(values.heroPriority.trim(), 10) : null,
   };
 }
 

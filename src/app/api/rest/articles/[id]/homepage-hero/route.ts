@@ -8,6 +8,7 @@ function revalidateHomepageHeroPaths(article: Awaited<ReturnType<typeof getArtic
   const paths = new Set<string>([
     "/",
     "/latest",
+    "/most-read",
     "/search",
     "/feed.xml",
     "/sitemap.xml",

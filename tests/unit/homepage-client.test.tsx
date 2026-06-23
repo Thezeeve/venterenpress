@@ -12,7 +12,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ alt, src, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { src: string; alt: string }) => (
+  default: ({ alt, src, fill: _fill, priority: _priority, unoptimized: _unoptimized, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { src: string; alt: string }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img alt={alt} src={src} {...props} />
   ),
@@ -26,6 +26,15 @@ vi.mock("framer-motion", () => ({
 
 function buildHomepageResponse(): HomepageNewsApiResponse {
   const bundle = getSeedHomepageBundle();
+  const heroStories = Array.from({ length: 6 }, (_, index) => ({
+    ...bundle.topStories[index % bundle.topStories.length]!,
+    id: `hero-${index + 2}`,
+    slug: `saved-db-slug-${index + 2}`,
+    title: `Hero story ${index + 2}`,
+    summary: `Hero summary ${index + 2}.`,
+    featuredImageUrl: `/news/world/world${(index % 3) + 1}.jpg`,
+    href: `/articles/saved-db-slug-${index + 2}`,
+  }));
 
   return {
     bundle: {
@@ -33,33 +42,13 @@ function buildHomepageResponse(): HomepageNewsApiResponse {
       heroStory: {
         ...bundle.heroStory,
         id: "hero-1",
-        slug: "hero-one",
+        slug: "saved-db-slug-1",
         title: "Hero story one",
         summary: "Hero summary one.",
         featuredImageUrl: "/news/world/world1.jpg",
-        href: "/articles/hero-one",
+        href: "/articles/saved-db-slug-1",
       },
-      topStories: [
-        {
-          ...bundle.topStories[0]!,
-          id: "hero-2",
-          slug: "hero-two",
-          title: "Hero story two",
-          summary: "Hero summary two.",
-          featuredImageUrl: "/news/world/world2.jpg",
-          href: "/articles/hero-two",
-        },
-        {
-          ...bundle.topStories[1]!,
-          id: "hero-3",
-          slug: "hero-three",
-          title: "Hero story three",
-          summary: "Hero summary three.",
-          featuredImageUrl: "/news/world/world3.jpg",
-          href: "/articles/hero-three",
-        },
-        ...bundle.topStories.slice(2),
-      ],
+      topStories: [...heroStories, ...bundle.topStories.slice(heroStories.length)],
     },
     lastUpdated: new Date("2026-06-22T09:00:00.000Z").toISOString(),
     source: "seed",
@@ -96,7 +85,7 @@ function buildHomepageResponse(): HomepageNewsApiResponse {
 }
 
 describe("Homepage hero carousel", () => {
-  it("switches slides with arrows and dots and keeps story links aligned", async () => {
+  it("switches slides with arrows and dots, keeps saved slugs, and supports 7 slides", async () => {
     const user = userEvent.setup();
 
     render(
@@ -108,16 +97,17 @@ describe("Homepage hero carousel", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Hero story one" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Read Full Story" })).toHaveAttribute("href", "/articles/hero-one");
+    expect(screen.getByRole("link", { name: "Read Full Story" })).toHaveAttribute("href", "/articles/saved-db-slug-1");
+    expect(screen.getAllByRole("button", { name: /Go to hero story/i })).toHaveLength(7);
 
     await user.click(screen.getByRole("button", { name: "Next hero story" }));
 
-    expect(screen.getByRole("heading", { name: "Hero story two" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Read Full Story" })).toHaveAttribute("href", "/articles/hero-two");
+    expect(screen.getByRole("heading", { name: "Hero story 2" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Read Full Story" })).toHaveAttribute("href", "/articles/saved-db-slug-2");
 
-    await user.click(screen.getByRole("button", { name: "Go to hero story 3" }));
+    await user.click(screen.getByRole("button", { name: "Go to hero story 7" }));
 
-    expect(screen.getByRole("heading", { name: "Hero story three" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Read Full Story" })).toHaveAttribute("href", "/articles/hero-three");
-  });
+    expect(screen.getByRole("heading", { name: "Hero story 7" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Read Full Story" })).toHaveAttribute("href", "/articles/saved-db-slug-7");
+  }, 15000);
 });

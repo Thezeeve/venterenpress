@@ -24,6 +24,7 @@ import {
   summarizeNotificationPreferences,
   type NewsroomArticleCard,
 } from "@/lib/newsroom";
+import { HOMEPAGE_HERO_MAX_ITEMS } from "@/lib/homepage-hero";
 
 export type PersonalizedHomepage = {
   newsletterPreferences: Record<string, unknown>;
@@ -713,7 +714,7 @@ export function HomepageClient({
 
   const heroSlides: HeroSlide[] = [
     bundle.heroStory,
-    ...takeUniqueStories(bundle.topStories, new Set<string>([getStoryIdentity(bundle.heroStory)]), 3),
+    ...takeUniqueStories(bundle.topStories, new Set<string>([getStoryIdentity(bundle.heroStory)]), HOMEPAGE_HERO_MAX_ITEMS - 1),
   ].map((article) => ({
     ...article,
     resolvedImageUrl: assignHomepageStoryImage(article, { preferPremium: true }),

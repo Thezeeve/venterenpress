@@ -12,10 +12,15 @@ export function formatCompactNumber(value: number) {
   }).format(value);
 }
 
-export function slugify(value: string) {
+export function normalizeSlug(value: string) {
   return value
+    .replace(/^\/+/, "")
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
+}
+
+export function slugify(value: string) {
+  return normalizeSlug(value);
 }

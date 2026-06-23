@@ -54,8 +54,20 @@ type EditorInitialArticle = {
   tagSlugs?: string[];
   featuredImageUrl?: string | null;
   featuredImageAlt?: string | null;
+  showOnHero?: boolean;
+  heroStartAt?: string | null;
+  heroEndAt?: string | null;
+  heroPriority?: number | null;
   isHomepageHero?: boolean;
 };
+
+function toDateTimeLocalValue(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return new Date(value).toISOString().slice(0, 16);
+}
 
 export function NewsroomEditor({
   articleId,
@@ -84,6 +96,10 @@ export function NewsroomEditor({
   const [categories, setCategories] = useState((initialArticle?.categorySlugs ?? []).join(", "));
   const [featuredImageUrl, setFeaturedImageUrl] = useState(initialArticle?.featuredImageUrl ?? "");
   const [featuredImageAlt, setFeaturedImageAlt] = useState(initialArticle?.featuredImageAlt ?? "");
+  const [showOnHero, setShowOnHero] = useState(initialArticle?.showOnHero ?? false);
+  const [heroStartAt, setHeroStartAt] = useState(toDateTimeLocalValue(initialArticle?.heroStartAt));
+  const [heroEndAt, setHeroEndAt] = useState(toDateTimeLocalValue(initialArticle?.heroEndAt));
+  const [heroPriority, setHeroPriority] = useState(initialArticle?.heroPriority?.toString() ?? "");
   const [imagePreviewUrl, setImagePreviewUrl] = useState(initialArticle?.featuredImageUrl ?? "");
   const [imageFileName, setImageFileName] = useState("");
   const [currentStatus, setCurrentStatus] = useState(initialArticle?.status ?? "DRAFT");
@@ -405,6 +421,10 @@ export function NewsroomEditor({
       seoDescription,
       featuredImageUrl,
       featuredImageAlt,
+      showOnHero,
+      heroStartAt,
+      heroEndAt,
+      heroPriority,
     };
     const issues = validateEditorIssues(editorValues, editor.getHTML());
 
@@ -444,6 +464,10 @@ export function NewsroomEditor({
           seoDescription,
           featuredImageUrl: featuredImageUrlRef.current,
           featuredImageAlt,
+          showOnHero,
+          heroStartAt,
+          heroEndAt,
+          heroPriority,
         },
         editor.getHTML(),
         intent,
@@ -485,6 +509,7 @@ export function NewsroomEditor({
       const nextArticleId = responseBody?.data?.id ?? currentArticleId;
       const nextSlug = responseBody?.data?.slug ?? payload.slug;
       setCurrentArticleId(nextArticleId);
+      setSlug(nextSlug);
       setCurrentStatus(responseBody?.data?.status ?? (intent === "publish" ? "PUBLISHED" : "DRAFT"));
       if (intent === "publish") {
         setPublicArticleHref(`/articles/${nextSlug}`);
@@ -796,6 +821,46 @@ export function NewsroomEditor({
                   {editionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Homepage Hero Slider</div>
+                <Select value={showOnHero ? "yes" : "no"} onChange={(event) => setShowOnHero(event.target.value === "yes")}>
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Hero Start</div>
+                <Input
+                  type="datetime-local"
+                  value={heroStartAt}
+                  onChange={(event) => setHeroStartAt(event.target.value)}
+                  className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Hero End</div>
+                <Input
+                  type="datetime-local"
+                  value={heroEndAt}
+                  onChange={(event) => setHeroEndAt(event.target.value)}
+                  className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Hero Priority</div>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="Optional"
+                  value={heroPriority}
+                  onChange={(event) => setHeroPriority(event.target.value)}
+                  className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
+                />
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -823,7 +888,7 @@ export function NewsroomEditor({
               {currentArticleId ? (
                 <HomepageHeroButton
                   articleId={currentArticleId}
-                  isHomepageHero={Boolean(initialArticle?.isHomepageHero && currentStatus === "PUBLISHED")}
+                  isHomepageHero={Boolean(showOnHero && currentStatus === "PUBLISHED")}
                   disabled={currentStatus !== "PUBLISHED"}
                 />
               ) : null}

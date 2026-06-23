@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement, type ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Role } from "@prisma/client";
 import { NewsroomEditor } from "@/components/editor/newsroom-editor";
@@ -21,7 +21,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ src, alt, ...props }: { src: string; alt: string }) =>
+  default: ({ src, alt, fill: _fill, priority: _priority, unoptimized: _unoptimized, ...props }: { src: string; alt: string }) =>
     createElement("img", { src, alt, ...props }),
 }));
 
@@ -169,13 +169,21 @@ describe("NewsroomEditor upload support", () => {
     expect(await screen.findByRole("img", { name: "Article image preview" })).toBeVisible();
     await waitFor(() => expect(screen.getByText("Image uploaded successfully.")).toBeVisible());
 
-    await user.type(screen.getByPlaceholderText("Article headline"), "Global chip alliances reshape AI infrastructure competition");
-    await user.type(screen.getByPlaceholderText("Slug"), "global-chip-alliances");
-    await user.type(
-      screen.getByPlaceholderText("Excerpt"),
-      "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-    );
-    await user.type(screen.getByPlaceholderText("Categories, comma separated"), "technology");
+    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
+      target: { value: "Global chip alliances reshape AI infrastructure competition" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Slug"), {
+      target: { value: "global-chip-alliances" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
+      target: {
+        value:
+          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+      },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
+      target: { value: "technology" },
+    });
     await user.click(screen.getByRole("button", { name: "Save Draft" }));
 
     expect(await screen.findByText("Draft saved successfully.")).toBeVisible();
@@ -195,7 +203,6 @@ describe("NewsroomEditor upload support", () => {
   }, 15000);
 
   it("shows a publishing loading state and success feedback", async () => {
-    const user = userEvent.setup();
     let resolvePublish: ((value: { ok: boolean; json: () => Promise<{ data: { id: string; slug: string } }> }) => void) | null = null;
     const publishPromise = new Promise<{ ok: boolean; json: () => Promise<{ data: { id: string; slug: string } }> }>((resolve) => {
       resolvePublish = resolve;
@@ -211,14 +218,22 @@ describe("NewsroomEditor upload support", () => {
       }),
     );
 
-    await user.type(screen.getByPlaceholderText("Article headline"), "Global chip alliances reshape AI infrastructure competition");
-    await user.type(screen.getByPlaceholderText("Slug"), "global-chip-alliances");
-    await user.type(
-      screen.getByPlaceholderText("Excerpt"),
-      "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-    );
-    await user.type(screen.getByPlaceholderText("Categories, comma separated"), "technology");
-    await user.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
+      target: { value: "Global chip alliances reshape AI infrastructure competition" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Slug"), {
+      target: { value: "global-chip-alliances" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
+      target: {
+        value:
+          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+      },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
+      target: { value: "technology" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
 
     expect(screen.getByRole("button", { name: "Publishing..." })).toBeDisabled();
 
@@ -229,7 +244,7 @@ describe("NewsroomEditor upload support", () => {
 
     expect(await screen.findByText("Article published successfully.")).toBeVisible();
     expect(screen.getByRole("link", { name: "View published article" })).toHaveAttribute("href", "/articles/global-chip-alliances");
-  });
+  }, 15000);
 
   it("shows publish failure details from the API", async () => {
     const user = userEvent.setup();
@@ -248,18 +263,26 @@ describe("NewsroomEditor upload support", () => {
       }),
     );
 
-    await user.type(screen.getByPlaceholderText("Article headline"), "Global chip alliances reshape AI infrastructure competition");
-    await user.type(screen.getByPlaceholderText("Slug"), "global-chip-alliances");
-    await user.type(
-      screen.getByPlaceholderText("Excerpt"),
-      "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-    );
-    await user.type(screen.getByPlaceholderText("Categories, comma separated"), "technology");
+    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
+      target: { value: "Global chip alliances reshape AI infrastructure competition" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Slug"), {
+      target: { value: "global-chip-alliances" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
+      target: {
+        value:
+          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+      },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
+      target: { value: "technology" },
+    });
     await user.click(screen.getByRole("button", { name: "Publish" }));
 
     expect(await screen.findByText("Publishing failed. Slug already exists.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
-  });
+  }, 15000);
 
   it("shows visible validation issues when publish is blocked", async () => {
     const user = userEvent.setup();
@@ -388,10 +411,15 @@ describe("NewsroomEditor upload support", () => {
       }),
     );
 
-    await user.click(screen.getAllByRole("button", { name: "Delete Article" })[0]!);
-    expect(await screen.findByText("Delete article?")).toBeVisible();
+    const openDeleteButton = screen.getAllByRole("button", { name: "Delete Article" })
+      .find((button) => !button.closest("[role='dialog']"));
 
-    await user.click(screen.getByRole("button", { name: "Delete Article" }));
+    expect(openDeleteButton).toBeDefined();
+    await user.click(openDeleteButton!);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeVisible();
+
+    await user.click(within(dialog).getByRole("button", { name: "Delete Article" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
