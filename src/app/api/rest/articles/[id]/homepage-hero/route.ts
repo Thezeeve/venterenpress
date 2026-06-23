@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { getArticleById, setHomepageHeroArticle } from "@/lib/articles";
+import { resetHomepageNewsInMemoryCache } from "@/lib/news-providers";
 import { validateBrowserMutation } from "@/lib/security";
 import { requireApiUser } from "@/lib/server-auth";
 
@@ -57,6 +58,7 @@ export async function POST(
       articleId: id,
     });
 
+    resetHomepageNewsInMemoryCache();
     revalidateHomepageHeroPaths(article);
     return NextResponse.json({ data: article });
   } catch (error) {

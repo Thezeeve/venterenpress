@@ -101,6 +101,7 @@ function buildLatestSidebar(stories: EditorialStory[]) {
 
 function flattenBundleStories(bundle: HomepageNewsBundle) {
   return uniqueStories([
+    ...bundle.heroCarouselStories,
     bundle.heroStory,
     ...bundle.topStories,
     ...bundle.worldNews,
@@ -122,6 +123,7 @@ function normalizeHomepageBundle(bundle: HomepageNewsBundle): HomepageNewsBundle
       summary: cleanNewsText(banner.summary),
     })),
     heroStory: normalizeLiveStory(bundle.heroStory),
+    heroCarouselStories: (bundle.heroCarouselStories ?? []).map((story) => normalizeLiveStory(story)),
     latestSidebar: bundle.latestSidebar.map((item) => ({
       ...item,
       headline: cleanNewsText(item.headline),
@@ -160,6 +162,7 @@ function filterHomepageBundleToVisibleStories(bundle: HomepageNewsBundle, visibl
   return {
     ...bundle,
     heroStory: nextHeroStory ?? firstVisibleStory ?? bundle.heroStory,
+    heroCarouselStories: bundle.heroCarouselStories.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
     topStories: bundle.topStories.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
     worldNews: bundle.worldNews.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
     businessNews: bundle.businessNews.filter((story) => isCmsStoryVisible(story, visibleCmsStoryIds)),
@@ -193,12 +196,7 @@ async function getHomepageHeroOverrides() {
   } as const;
 
   try {
-    const [fallbackHeroArticle, carouselArticles, visibleCmsArticles] = await Promise.all([
-      prisma.article.findFirst({
-        where: { status: "PUBLISHED", deletedAt: null },
-        include: articleInclude,
-        orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
-      }),
+    const [carouselArticles, visibleCmsArticles] = await Promise.all([
       prisma.article.findMany({
         where: { status: "PUBLISHED", deletedAt: null, showOnHero: true },
         include: articleInclude,
@@ -217,13 +215,21 @@ async function getHomepageHeroOverrides() {
     ]);
 
     const activeHeroArticles = selectActiveHomepageHeroArticles(carouselArticles);
+    const manualHeroStories = activeHeroArticles.map(toEditorialStoryFromArticle)
+      .filter((story) => story.storySourceType === "manual");
+    const manualHeroArticle = manualHeroStories[0] ?? null;
 
-    const manualHeroArticle = activeHeroArticles[0] ?? null;
+    console.info("[homepage-hero] resolved manual hero articles", manualHeroStories.map((story) => ({
+      heroArticleId: story.id,
+      heroArticleSlug: story.slug,
+      heroArticleSource: story.storySourceType,
+      generatedHref: story.href ?? `/articles/${story.slug}`,
+    })));
 
     return {
-      manualHero: manualHeroArticle ? toEditorialStoryFromArticle(manualHeroArticle) : null,
-      fallbackHero: fallbackHeroArticle ? toEditorialStoryFromArticle(fallbackHeroArticle) : null,
-      heroCarouselStories: activeHeroArticles.map(toEditorialStoryFromArticle),
+      manualHero: manualHeroArticle,
+      fallbackHero: null,
+      heroCarouselStories: manualHeroStories,
       visibleCmsStoryIds: new Set(visibleCmsArticles.map((article) => article.id)),
     };
   } catch {
@@ -336,6 +342,7 @@ export function buildLiveHomepageBundle(providerStories: EditorialStory[]): Home
   return {
     ...normalizeHomepageBundle(seed),
     mode: "live",
+    heroCarouselStories: [],
     latestSidebar: buildLatestSidebar(latestStories),
     topStories: ensureCount(
       [

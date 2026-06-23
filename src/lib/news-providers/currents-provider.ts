@@ -62,6 +62,7 @@ export class CurrentsNewsProvider implements NewsProvider {
           sourceName: cleanNewsText("Currents API"),
           sourceUrl: story.url,
           provider: "currents",
+          storySourceType: "live",
           href: story.url,
           isExternal: true,
         });

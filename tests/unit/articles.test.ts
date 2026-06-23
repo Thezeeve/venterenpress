@@ -119,15 +119,19 @@ describe("article persistence", () => {
   it("resolves articles by normalized slug when the incoming route slug is not canonical", async () => {
     mocks.prisma.article.findUnique
       .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: "article-1", slug: "keir-starmer-resigns" });
 
-    const article = await getArticleBySlug("/Keir Starmer Resigns///");
+    const article = await getArticleBySlug("/articles/Keir Starmer Resigns///");
 
     expect(article).toEqual({ id: "article-1", slug: "keir-starmer-resigns" });
     expect(mocks.prisma.article.findUnique).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      where: { slug: "/Keir Starmer Resigns///" },
+      where: { slug: "/articles/Keir Starmer Resigns///" },
     }));
     expect(mocks.prisma.article.findUnique).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: { slug: "Keir Starmer Resigns///" },
+    }));
+    expect(mocks.prisma.article.findUnique).toHaveBeenNthCalledWith(3, expect.objectContaining({
       where: { slug: "keir-starmer-resigns" },
     }));
   });

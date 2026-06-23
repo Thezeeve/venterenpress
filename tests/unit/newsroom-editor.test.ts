@@ -21,8 +21,8 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ src, alt, fill: _fill, priority: _priority, unoptimized: _unoptimized, ...props }: { src: string; alt: string }) =>
-    createElement("img", { src, alt, ...props }),
+  default: ({ src, alt }: { src: string; alt: string }) =>
+    createElement("img", { src, alt }),
 }));
 
 vi.mock("@tiptap/react", () => ({

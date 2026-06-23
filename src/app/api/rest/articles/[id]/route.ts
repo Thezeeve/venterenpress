@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { formatArticleMutationError, getArticleById, softDeleteArticle, updateArticle } from "@/lib/articles";
+import { resetHomepageNewsInMemoryCache } from "@/lib/news-providers";
 import { validateBrowserMutation } from "@/lib/security";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleInputSchema } from "@/lib/validation";
@@ -87,6 +88,7 @@ export async function PATCH(
       articleId: id,
       data: parsed.data,
     });
+    resetHomepageNewsInMemoryCache();
     revalidateArticlePaths({
       slugs: [existingArticle?.slug, article.slug].filter((slug): slug is string => Boolean(slug)),
       categorySlugs: [
@@ -126,6 +128,7 @@ export async function DELETE(
     articleId: id,
   });
 
+  resetHomepageNewsInMemoryCache();
   revalidateArticlePaths({
     slugs: [existingArticle?.slug, article.slug].filter((slug): slug is string => Boolean(slug)),
     categorySlugs: [

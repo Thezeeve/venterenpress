@@ -16,6 +16,7 @@ describe("homepage hero selection", () => {
       slug: "manual-hero-story",
       title: "Manual hero story",
       provider: "cms",
+      storySourceType: "manual" as const,
       isExternal: false,
       href: "/articles/manual-hero-story",
     };
@@ -63,6 +64,7 @@ describe("homepage hero selection", () => {
         slug: "cms-story-2",
         title: "CMS story two",
         provider: "cms",
+        storySourceType: "manual" as const,
         href: "/articles/cms-story-2",
       },
       {
@@ -71,14 +73,36 @@ describe("homepage hero selection", () => {
         slug: "cms-story-3",
         title: "CMS story three",
         provider: "cms",
+        storySourceType: "manual" as const,
         href: "/articles/cms-story-3",
       },
     ];
 
     const updated = applyHomepageHeroSelection(bundle, null, bundle.heroStory, cmsStories);
 
-    expect(updated.topStories[0]?.id).toBe("cms-2");
-    expect(updated.topStories[1]?.id).toBe("cms-3");
+    expect(updated.heroCarouselStories[0]?.id).toBe("cms-2");
+    expect(updated.heroCarouselStories[1]?.id).toBe("cms-3");
+  });
+
+  it("drops non-manual stories if they accidentally enter hero selection", () => {
+    const bundle = getSeedHomepageBundle();
+
+    const updated = applyHomepageHeroSelection(bundle, null, bundle.heroStory, [
+      {
+        ...bundle.topStories[0]!,
+        id: "manual-hero",
+        provider: "cms",
+        storySourceType: "manual",
+      },
+      {
+        ...bundle.topStories[1]!,
+        id: "live-hero",
+        provider: "gnews",
+        storySourceType: "live",
+      },
+    ]);
+
+    expect(updated.heroCarouselStories.map((story) => story.id)).toEqual(["manual-hero"]);
   });
 
   it("filters expired hero articles while keeping non-expired ones available for hero selection", () => {

@@ -7,7 +7,10 @@ import type { EditorialStory } from "@/lib/news-providers/types";
 
 export function normalizeLiveStory(story: EditorialStory) {
   if (!story.isExternal) {
-    return story;
+    return {
+      ...story,
+      storySourceType: story.storySourceType ?? "manual",
+    };
   }
 
   const cleanedTitle = cleanNewsText(story.title);
@@ -37,6 +40,7 @@ export function normalizeLiveStory(story: EditorialStory) {
     seoDescription: cleanNewsText(story.seoDescription) || cleanedSummary || cleanedTitle,
     sourceName: cleanedSourceName,
     href: `/articles/${story.slug}`,
+    storySourceType: "live",
   };
 
   normalized.featuredImageUrl = sanitizeNewsImage({

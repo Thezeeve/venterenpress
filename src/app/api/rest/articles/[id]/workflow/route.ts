@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { getArticleById, transitionArticleWorkflow } from "@/lib/articles";
+import { resetHomepageNewsInMemoryCache } from "@/lib/news-providers";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleWorkflowActionSchema } from "@/lib/validation";
 
@@ -27,6 +28,7 @@ function revalidateArticleWorkflowPaths(input: {
   const paths = new Set<string>([
     "/",
     "/latest",
+    "/most-read",
     "/search",
     "/topics",
     "/categories",
@@ -84,6 +86,7 @@ export async function POST(
     approverId: parsed.data.approverId,
     scheduledFor: parsed.data.scheduledFor,
   });
+  resetHomepageNewsInMemoryCache();
   revalidateArticleWorkflowPaths({
     before: existingArticle,
     after: article,

@@ -62,6 +62,7 @@ export class TheNewsApiProvider implements NewsProvider {
           sourceName: cleanNewsText(story.source || "The News API"),
           sourceUrl: story.url,
           provider: "the-news-api",
+          storySourceType: "live",
           href: story.url,
           isExternal: true,
         });

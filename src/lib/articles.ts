@@ -68,6 +68,14 @@ function getCanonicalArticleSlug(input: Pick<ArticleMutationInput, "slug" | "tit
   return normalizeSlug(input.slug?.trim() || input.title);
 }
 
+function stripArticleRoutePrefix(value: string) {
+  return decodeURIComponent(String(value ?? ""))
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/^articles\/+/i, "")
+    .trim();
+}
+
 async function generateUniqueArticleSlug(input: {
   slug?: string;
   title: string;
@@ -98,13 +106,14 @@ async function generateUniqueArticleSlug(input: {
 }
 
 export function normalizeArticleRouteSlug(slug: string) {
-  return normalizeSlug(decodeURIComponent(slug ?? ""));
+  return normalizeSlug(stripArticleRoutePrefix(slug));
 }
 
 export function getArticleSlugCandidates(slug: string) {
   const exactSlug = String(slug ?? "").trim();
+  const routeSlug = stripArticleRoutePrefix(slug);
   const normalizedSlug = normalizeArticleRouteSlug(exactSlug);
-  return [...new Set([exactSlug, normalizedSlug].filter(Boolean))];
+  return [...new Set([exactSlug, routeSlug, normalizedSlug].filter(Boolean))];
 }
 
 function createHeroPriorityOrderClause() {

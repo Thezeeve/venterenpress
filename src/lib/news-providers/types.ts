@@ -5,6 +5,8 @@ export type EditorialAuthor = {
   role: string;
 };
 
+export type EditorialStorySourceType = "manual" | "live" | "seed";
+
 export type EditorialStory = {
   id: string;
   title: string;
@@ -26,6 +28,7 @@ export type EditorialStory = {
   sourceName: string;
   sourceUrl: string | null;
   provider: string;
+  storySourceType: EditorialStorySourceType;
   isBreaking?: boolean;
   isOpinion?: boolean;
   isLive?: boolean;
@@ -54,6 +57,7 @@ export type HomepageNewsBundle = {
   mode: NewsMode;
   breakingBanners: BreakingBanner[];
   heroStory: EditorialStory;
+  heroCarouselStories: EditorialStory[];
   latestSidebar: LatestSidebarItem[];
   topStories: EditorialStory[];
   worldNews: EditorialStory[];

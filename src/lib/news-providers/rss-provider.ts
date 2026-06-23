@@ -74,6 +74,7 @@ function buildRssStory(item: string, feed: RssFeedConfig): EditorialStory | null
     sourceName: cleanNewsText(feed.sourceName),
     sourceUrl: link,
     provider: "rss",
+    storySourceType: "live",
     href: link,
     isExternal: true,
   });

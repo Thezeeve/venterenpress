@@ -65,6 +65,7 @@ export class GuardianNewsProvider implements NewsProvider {
           sourceName: "The Guardian Open Platform",
           sourceUrl: story.webUrl,
           provider: "guardian",
+          storySourceType: "live",
           href: story.webUrl,
           isExternal: true,
         });

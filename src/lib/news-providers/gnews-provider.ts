@@ -60,6 +60,7 @@ export class GNewsProvider implements NewsProvider {
           sourceName: cleanNewsText(story.source?.name ?? "GNews"),
           sourceUrl: story.url,
           provider: "gnews",
+          storySourceType: "live",
           href: story.url,
           isExternal: true,
         });

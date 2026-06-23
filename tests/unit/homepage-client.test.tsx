@@ -12,9 +12,9 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ alt, src, fill: _fill, priority: _priority, unoptimized: _unoptimized, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { src: string; alt: string }) => (
+  default: ({ alt, src }: React.ImgHTMLAttributes<HTMLImageElement> & { src: string; alt: string }) => (
     // eslint-disable-next-line @next/next/no-img-element
-    <img alt={alt} src={src} {...props} />
+    <img alt={alt} src={src} />
   ),
 }));
 
@@ -26,7 +26,7 @@ vi.mock("framer-motion", () => ({
 
 function buildHomepageResponse(): HomepageNewsApiResponse {
   const bundle = getSeedHomepageBundle();
-  const heroStories = Array.from({ length: 6 }, (_, index) => ({
+  const heroStories = Array.from({ length: 7 }, (_, index) => ({
     ...bundle.topStories[index % bundle.topStories.length]!,
     id: `hero-${index + 2}`,
     slug: `saved-db-slug-${index + 2}`,
@@ -34,6 +34,8 @@ function buildHomepageResponse(): HomepageNewsApiResponse {
     summary: `Hero summary ${index + 2}.`,
     featuredImageUrl: `/news/world/world${(index % 3) + 1}.jpg`,
     href: `/articles/saved-db-slug-${index + 2}`,
+    provider: "cms",
+    storySourceType: "manual" as const,
   }));
 
   return {
@@ -41,14 +43,38 @@ function buildHomepageResponse(): HomepageNewsApiResponse {
       ...bundle,
       heroStory: {
         ...bundle.heroStory,
-        id: "hero-1",
-        slug: "saved-db-slug-1",
-        title: "Hero story one",
-        summary: "Hero summary one.",
+        id: "live-hero",
+        slug: "live-wire-headline",
+        title: "Live wire headline",
+        summary: "This should never render in the homepage hero slider.",
         featuredImageUrl: "/news/world/world1.jpg",
-        href: "/articles/saved-db-slug-1",
+        href: "/articles/live-wire-headline",
+        provider: "gnews",
+        storySourceType: "live",
       },
-      topStories: [...heroStories, ...bundle.topStories.slice(heroStories.length)],
+      heroCarouselStories: [
+        {
+          ...bundle.heroStory,
+          id: "hero-1",
+          slug: "saved-db-slug-1",
+          title: "Hero story one",
+          summary: "Hero summary one.",
+          featuredImageUrl: "/news/world/world1.jpg",
+          href: "/articles/saved-db-slug-1",
+          provider: "cms",
+          storySourceType: "manual",
+        },
+        ...heroStories,
+      ],
+      topStories: bundle.topStories.map((story, index) => ({
+        ...story,
+        id: `live-top-${index + 1}`,
+        slug: `live-top-slug-${index + 1}`,
+        title: `Live top story ${index + 1}`,
+        href: `/articles/live-top-slug-${index + 1}`,
+        provider: "newsapi",
+        storySourceType: "live",
+      })),
     },
     lastUpdated: new Date("2026-06-22T09:00:00.000Z").toISOString(),
     source: "seed",
@@ -99,6 +125,7 @@ describe("Homepage hero carousel", () => {
     expect(screen.getByRole("heading", { name: "Hero story one" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Read Full Story" })).toHaveAttribute("href", "/articles/saved-db-slug-1");
     expect(screen.getAllByRole("button", { name: /Go to hero story/i })).toHaveLength(7);
+    expect(screen.queryByRole("heading", { name: "Live wire headline" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Next hero story" }));
 

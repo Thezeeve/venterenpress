@@ -350,7 +350,19 @@ function LeadHeroCarousel({ slides }: { slides: HeroSlide[] }) {
   }, [activeSlide?.resolvedImageUrl]);
 
   if (!activeSlide) {
-    return null;
+    return (
+      <article className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-[0_24px_48px_rgba(15,23,42,0.08)] sm:p-8">
+        <div className="max-w-[640px]">
+          <Badge className="border-0 bg-[#D8261D] text-white shadow-none">Homepage Hero</Badge>
+          <h1 className="mt-4 font-serif text-[clamp(30px,3vw,42px)] leading-[1.12] tracking-[-0.02em] text-[var(--foreground)]">
+            No editorial hero story is pinned right now.
+          </h1>
+          <p className="mt-4 text-sm leading-7 text-[var(--muted-foreground)] sm:text-base">
+            Publish a manual article and enable homepage hero placement to feature it here.
+          </p>
+        </div>
+      </article>
+    );
   }
 
   const hasHeroImage = Boolean(activeSlide.resolvedImageUrl) && heroVisible;
@@ -712,10 +724,9 @@ export function HomepageClient({
     };
   }, [newsResponse.lastUpdated, refreshIntervalMinutes]);
 
-  const heroSlides: HeroSlide[] = [
-    bundle.heroStory,
-    ...takeUniqueStories(bundle.topStories, new Set<string>([getStoryIdentity(bundle.heroStory)]), HOMEPAGE_HERO_MAX_ITEMS - 1),
-  ].map((article) => ({
+  const heroSlides: HeroSlide[] = takeUniqueStories(bundle.heroCarouselStories, new Set<string>(), HOMEPAGE_HERO_MAX_ITEMS)
+    .filter((story) => story.storySourceType === "manual")
+    .map((article) => ({
     ...article,
     resolvedImageUrl: assignHomepageStoryImage(article, { preferPremium: true }),
   }));

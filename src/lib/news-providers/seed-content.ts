@@ -17,12 +17,13 @@ const seedImage = {
 } as const;
 
 function buildStory(
-  input: Omit<EditorialStory, "id" | "slug" | "href" | "seoTitle" | "seoDescription" | "provider"> & {
+  input: Omit<EditorialStory, "id" | "slug" | "href" | "seoTitle" | "seoDescription" | "provider" | "storySourceType"> & {
     slug?: string;
     href?: string;
     seoTitle?: string;
     seoDescription?: string;
     provider?: string;
+    storySourceType?: EditorialStory["storySourceType"];
   },
 ): EditorialStory {
   const slug = input.slug ?? slugify(input.title);
@@ -35,6 +36,7 @@ function buildStory(
     seoTitle: input.seoTitle ?? input.title,
     seoDescription: input.seoDescription ?? input.summary,
     provider: input.provider ?? "seed",
+    storySourceType: input.storySourceType ?? "seed",
   };
 }
 
@@ -568,6 +570,7 @@ export function getSeedHomepageBundle(): HomepageNewsBundle {
       },
     ],
     heroStory,
+    heroCarouselStories: [],
     latestSidebar: latestStories.map((story) => ({
       id: story.id,
       headline: story.title,

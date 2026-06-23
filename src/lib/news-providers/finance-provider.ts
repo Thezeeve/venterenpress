@@ -78,6 +78,7 @@ export class FinanceNewsProvider implements NewsProvider {
         sourceName: "Alpha Vantage",
         sourceUrl: "https://www.alphavantage.co/documentation/",
         provider: "finance",
+        storySourceType: "live",
         href: "https://www.alphavantage.co/documentation/",
         isExternal: true,
       });
@@ -105,6 +106,7 @@ export class FinanceNewsProvider implements NewsProvider {
         sourceName: "Finnhub",
         sourceUrl: "https://finnhub.io/docs/api",
         provider: "finance",
+        storySourceType: "live",
         href: "https://finnhub.io/docs/api",
         isExternal: true,
       });
@@ -132,6 +134,7 @@ export class FinanceNewsProvider implements NewsProvider {
         sourceName: "CoinGecko",
         sourceUrl: "https://docs.coingecko.com/reference/simple-price",
         provider: "finance",
+        storySourceType: "live",
         href: "https://docs.coingecko.com/reference/simple-price",
         isExternal: true,
       });

@@ -133,6 +133,7 @@ export function toEditorialStoryFromArticle(article: HomepageHeroArticle): Edito
     sourceName: siteConfig.name,
     sourceUrl: null,
     provider: "cms",
+    storySourceType: "manual",
     isExternal: false,
     isBreaking: false,
     isOpinion: article.articleType === "OPINION" || article.articleType === "EDITORIAL",
@@ -148,27 +149,13 @@ export function applyHomepageHeroSelection(
   heroCarouselStories: EditorialStory[] = [],
 ) {
   const heroStory = manualHero ?? fallbackHero ?? bundle.heroStory;
-  const seen = new Set<string>();
-  const mergedTopStories = [
-    ...heroCarouselStories,
-    ...bundle.topStories,
-  ].filter((story) => {
-    if (isSameStory(story, heroStory)) {
-      return false;
-    }
-
-    const key = story.id || story.href || story.slug;
-    if (!key || seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
+  const editorialHeroStories = heroCarouselStories.filter((story) => story.storySourceType === "manual");
+  const topStories = bundle.topStories.filter((story) => !isSameStory(story, heroStory));
 
   return {
     ...bundle,
     heroStory,
-    topStories: mergedTopStories,
+    heroCarouselStories: editorialHeroStories,
+    topStories,
   } satisfies HomepageNewsBundle;
 }

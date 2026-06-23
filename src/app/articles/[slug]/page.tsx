@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { isDatabaseAvailable } from "@/lib/database-availability";
 import { resolveArticleHeroImage, resolveArticleImage, selectArticlePageSource } from "@/lib/article-rendering";
-import { getArticleBySlug, normalizeArticleRouteSlug } from "@/lib/articles";
+import { getArticleBySlug, getArticleSlugCandidates, normalizeArticleRouteSlug } from "@/lib/articles";
 import { getHomepageNewsResponse, getHomepageStoryBySlug } from "@/lib/news-providers";
 import { getSeedStoryBySlug, seededEditorialStories } from "@/lib/news-providers/seed-content";
 import {
@@ -280,26 +280,32 @@ const publicArticleInclude = {
 } as const;
 
 async function findFullDatabaseArticleByRouteSlug(slug: string) {
-  const exactSlug = slug.trim();
-  const normalizedSlug = normalizeArticleRouteSlug(slug);
+  const candidates = getArticleSlugCandidates(slug);
 
-  const exactMatch = await prisma.article.findUnique({
-    where: { slug: exactSlug },
-    include: publicArticleInclude,
+  console.info("[article-route] lookup candidates", {
+    requestedSlug: slug,
+    normalizedSlug: normalizeArticleRouteSlug(slug),
+    routeLookupCandidates: candidates,
   });
 
-  if (exactMatch) {
-    return exactMatch;
+  for (const candidate of candidates) {
+    const article = await prisma.article.findUnique({
+      where: { slug: candidate },
+      include: publicArticleInclude,
+    });
+
+    console.info("[article-route] database lookup result", {
+      requestedSlug: slug,
+      candidateSlug: candidate,
+      databaseLookupResult: article ? { id: article.id, slug: article.slug, status: article.status } : null,
+    });
+
+    if (article) {
+      return article;
+    }
   }
 
-  if (!normalizedSlug || normalizedSlug === exactSlug) {
-    return null;
-  }
-
-  return prisma.article.findUnique({
-    where: { slug: normalizedSlug },
-    include: publicArticleInclude,
-  });
+  return null;
 }
 
 function getDemoArticleSidebar(slug: string) {

@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { ArticleStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { createArticle, formatArticleMutationError, listArticles } from "@/lib/articles";
+import { resetHomepageNewsInMemoryCache } from "@/lib/news-providers";
 import { validateBrowserMutation } from "@/lib/security";
 import { requireApiUser } from "@/lib/server-auth";
 import { articleInputSchema } from "@/lib/validation";
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
       data: parsed.data,
     });
 
+    resetHomepageNewsInMemoryCache();
     revalidateArticlePaths({
       slugs: [article.slug],
       categorySlugs: parsed.data.categorySlugs,
