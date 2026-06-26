@@ -414,7 +414,7 @@ function LeadHeroCarousel({ slides }: { slides: HeroSlide[] }) {
         goToSlide(delta > 0 ? activeIndex - 1 : activeIndex + 1);
       }}
     >
-      <div className={hasHeroImage ? "relative min-h-[392px] sm:min-h-[432px] lg:min-h-[468px]" : "bg-white p-5 sm:p-7 lg:p-8"}>
+      <div className={hasHeroImage ? "relative min-h-[clamp(24rem,78vw,27rem)] sm:min-h-[432px] lg:min-h-[468px]" : "bg-white p-5 sm:p-7 lg:p-8"}>
         {hasHeroImage ? (
           <>
             <SafeNewsImage
@@ -426,11 +426,11 @@ function LeadHeroCarousel({ slides }: { slides: HeroSlide[] }) {
               className="object-cover object-[center_34%]"
               onVisibilityChange={setHeroVisible}
             />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,18,0.9)_0%,rgba(5,10,18,0.6)_38%,rgba(5,10,18,0.22)_72%,rgba(5,10,18,0.14)_100%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,10,18,0.08)_0%,rgba(5,10,18,0.2)_34%,rgba(5,10,18,0.78)_72%,rgba(5,10,18,0.94)_100%)] sm:bg-[linear-gradient(90deg,rgba(5,10,18,0.9)_0%,rgba(5,10,18,0.6)_38%,rgba(5,10,18,0.22)_72%,rgba(5,10,18,0.14)_100%)]" />
           </>
         ) : null}
-        <div className={hasHeroImage ? "absolute inset-0 flex items-end p-5 sm:p-7 lg:p-8" : "flex items-end"}>
-          <div className={hasHeroImage ? "max-w-[640px] text-white" : "max-w-[760px]"}>
+        <div className={hasHeroImage ? "absolute inset-0 flex flex-col justify-end p-4 pb-16 sm:p-7 sm:pb-16 lg:p-8" : "flex items-end"}>
+          <div className={hasHeroImage ? "flex w-full min-h-full max-w-[34rem] min-w-0 flex-col justify-end text-white sm:max-w-[38rem] lg:max-w-[40rem]" : "max-w-[760px]"}>
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border-0 bg-[#D8261D] text-white shadow-none">{activeSlide.category}</Badge>
               {canNavigate ? (
@@ -439,16 +439,26 @@ function LeadHeroCarousel({ slides }: { slides: HeroSlide[] }) {
                 </span>
               ) : null}
             </div>
-            <h1 className="mt-4 max-w-[660px] font-serif text-[clamp(33px,3vw,45px)] leading-[1.12] tracking-[-0.02em]">
+            <h1
+              className="mt-3 overflow-hidden font-serif text-[clamp(1.5rem,1rem+2.4vw,2.8rem)] leading-[clamp(1.9rem,1.35rem+2.5vw,3.15rem)] tracking-[-0.02em] [display:-webkit-box] [-webkit-box-orient:vertical] [text-wrap:balance] sm:mt-4 sm:text-[clamp(2rem,3vw,2.8rem)] sm:leading-[1.1] lg:leading-[1.12]"
+              style={{ WebkitLineClamp: 3 }}
+            >
               {activeSlide.title}
             </h1>
-            <p className={hasHeroImage ? "mt-4 max-w-[36rem] text-sm leading-7 text-white/82 sm:text-base" : "mt-4 max-w-[42rem] text-sm leading-7 text-[var(--muted-foreground)] sm:text-base"}>
-              {activeSlide.summary}
-            </p>
-            <div className={hasHeroImage ? "mt-5 text-sm text-white/78" : "mt-5 text-sm text-[var(--muted-foreground)]"}>
-              {formatRelativeTime(activeSlide.publishedAt)}
-            </div>
-            <div className="mt-5">
+            {activeSlide.summary ? (
+              <p
+                className={hasHeroImage
+                  ? "mt-3 max-w-[34rem] overflow-hidden text-[clamp(0.9rem,0.84rem+0.25vw,1rem)] leading-[clamp(1.35rem,1.2rem+0.75vw,1.75rem)] text-white/82 [display:-webkit-box] [-webkit-box-orient:vertical] sm:mt-4 sm:max-w-[36rem]"
+                  : "mt-3 max-w-[42rem] text-sm leading-6 text-[var(--muted-foreground)] sm:mt-4 sm:text-base sm:leading-7"}
+                style={hasHeroImage ? { WebkitLineClamp: 3 } : undefined}
+              >
+                {activeSlide.summary}
+              </p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 sm:mt-5">
+              <div className={hasHeroImage ? "text-sm text-white/78" : "text-sm text-[var(--muted-foreground)]"}>
+                {formatRelativeTime(activeSlide.publishedAt)}
+              </div>
               <ButtonStoryLink
                 href={href}
                 isExternal={activeSlide.isExternal}
