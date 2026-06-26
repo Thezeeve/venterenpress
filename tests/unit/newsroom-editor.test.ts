@@ -42,9 +42,42 @@ vi.mock("@tiptap/react", () => ({
 const categoryOptions = [{ label: "Technology", value: "technology" }];
 const editionOptions = [{ label: "United States", value: "UNITED_STATES" }];
 
+function getHeroSliderSelect() {
+  return screen.getByDisplayValue("No");
+}
+
+function getLocalDateAndTimeParts(value: string) {
+  const parsed = new Date(value);
+  const pad = (input: number) => String(input).padStart(2, "0");
+
+  return {
+    date: `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
+    time: `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`,
+  };
+}
+
+function fillRequiredFields() {
+  fireEvent.change(screen.getByPlaceholderText("Article headline"), {
+    target: { value: "Global chip alliances reshape AI infrastructure competition" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("Slug"), {
+    target: { value: "global-chip-alliances" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
+    target: {
+      value:
+        "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+    },
+  });
+  fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
+    target: { value: "technology" },
+  });
+}
+
 describe("NewsroomEditor upload support", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
     routerPush.mockReset();
     routerRefresh.mockReset();
     if (!("createObjectURL" in URL)) {
@@ -169,21 +202,7 @@ describe("NewsroomEditor upload support", () => {
     expect(await screen.findByRole("img", { name: "Article image preview" })).toBeVisible();
     await waitFor(() => expect(screen.getByText("Image uploaded successfully.")).toBeVisible());
 
-    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
-      target: { value: "Global chip alliances reshape AI infrastructure competition" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Slug"), {
-      target: { value: "global-chip-alliances" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
-      target: {
-        value:
-          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-      },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
-      target: { value: "technology" },
-    });
+    fillRequiredFields();
     await user.click(screen.getByRole("button", { name: "Save Draft" }));
 
     expect(await screen.findByText("Draft saved successfully.")).toBeVisible();
@@ -220,21 +239,7 @@ describe("NewsroomEditor upload support", () => {
       }),
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
-      target: { value: "Global chip alliances reshape AI infrastructure competition" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Slug"), {
-      target: { value: "global-chip-alliances" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
-      target: {
-        value:
-          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-      },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
-      target: { value: "technology" },
-    });
+    fillRequiredFields();
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
 
     expect(screen.getByRole("button", { name: "Publishing..." })).toBeDisabled();
@@ -265,21 +270,7 @@ describe("NewsroomEditor upload support", () => {
       }),
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
-      target: { value: "Global chip alliances reshape AI infrastructure competition" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Slug"), {
-      target: { value: "global-chip-alliances" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
-      target: {
-        value:
-          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-      },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
-      target: { value: "technology" },
-    });
+    fillRequiredFields();
     await user.click(screen.getByRole("button", { name: "Publish" }));
 
     expect(await screen.findByText("Publishing failed. Slug already exists.")).toBeVisible();
@@ -311,20 +302,14 @@ describe("NewsroomEditor upload support", () => {
       }),
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
-      target: { value: "Global chip alliances reshape AI infrastructure competition" },
+    fillRequiredFields();
+    fireEvent.change(getHeroSliderSelect(), { target: { value: "yes" } });
+    await user.click(screen.getByRole("button", { name: /Schedule start/i }));
+    fireEvent.change(screen.getByLabelText("Start Date"), {
+      target: { value: "2026-06-26" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Slug"), {
-      target: { value: "global-chip-alliances" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
-      target: {
-        value:
-          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-      },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
-      target: { value: "technology" },
+    fireEvent.change(screen.getByLabelText("Start Time"), {
+      target: { value: "11:30" },
     });
     await user.click(screen.getByRole("button", { name: "Publish" }));
 
@@ -367,20 +352,9 @@ describe("NewsroomEditor upload support", () => {
       }),
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
-      target: { value: "Global chip alliances reshape AI infrastructure competition" },
-    });
+    fillRequiredFields();
     fireEvent.change(screen.getByPlaceholderText("Slug"), {
       target: { value: "manual-image-story" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
-      target: {
-        value:
-          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-      },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
-      target: { value: "technology" },
     });
     fireEvent.change(screen.getByPlaceholderText("Image URL"), {
       target: { value: "https://cdn.example.com/manual.jpg" },
@@ -398,10 +372,27 @@ describe("NewsroomEditor upload support", () => {
     expect(requestBody.featuredImageUrl).toBe("https://cdn.example.com/manual.jpg");
   });
 
-  it("normalizes hero scheduling values to ISO before submit", async () => {
+  it("hides the hero schedule card until homepage hero is enabled", async () => {
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    expect(screen.queryByText("Homepage Hero Schedule")).not.toBeInTheDocument();
+
+    fireEvent.change(getHeroSliderSelect(), { target: { value: "yes" } });
+
+    expect(screen.getByText("Homepage Hero Schedule")).toBeVisible();
+    expect(screen.getByText("Homepage Hero enabled")).toBeVisible();
+  });
+
+  it("submits null hero fields when homepage hero is disabled", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ data: { id: "article-2", slug: "scheduled-story" } }),
+      json: async () => ({ data: { id: "article-2", slug: "global-chip-alliances" } }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -413,27 +404,56 @@ describe("NewsroomEditor upload support", () => {
       }),
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
-      target: { value: "Global chip alliances reshape AI infrastructure competition" },
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/rest/articles",
+        expect.objectContaining({ method: "POST" }),
+      );
     });
+
+    const requestBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(requestBody.heroStartAt).toBeNull();
+    expect(requestBody.heroEndAt).toBeNull();
+    expect(requestBody.heroPriority).toBeNull();
+  });
+
+  it("normalizes scheduled hero values to ISO before submit", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: "article-2", slug: "scheduled-story" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    fillRequiredFields();
     fireEvent.change(screen.getByPlaceholderText("Slug"), {
       target: { value: "scheduled-story" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
-      target: {
-        value:
-          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-      },
+    fireEvent.change(getHeroSliderSelect(), { target: { value: "yes" } });
+    await user.click(screen.getByRole("button", { name: /Schedule start/i }));
+    fireEvent.change(screen.getByLabelText("Start Date"), {
+      target: { value: "2026-06-26" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
-      target: { value: "technology" },
+    fireEvent.change(screen.getByLabelText("Start Time"), {
+      target: { value: "11:30" },
     });
-    const datetimeInputs = document.querySelectorAll('input[type="datetime-local"]');
-    fireEvent.change(datetimeInputs[0] as HTMLInputElement, {
-      target: { value: "2026-06-26T11:30" },
+    await user.click(screen.getByRole("checkbox", { name: /Remove from hero automatically/i }));
+    fireEvent.change(screen.getByLabelText("End Date"), {
+      target: { value: "2026-07-03" },
     });
-    fireEvent.change(datetimeInputs[1] as HTMLInputElement, {
-      target: { value: "2026-07-03T12:45" },
+    fireEvent.change(screen.getByLabelText("End Time"), {
+      target: { value: "12:45" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
 
@@ -447,6 +467,138 @@ describe("NewsroomEditor upload support", () => {
     const requestBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
     expect(requestBody.heroStartAt).toBe(new Date(2026, 5, 26, 11, 30, 0, 0).toISOString());
     expect(requestBody.heroEndAt).toBe(new Date(2026, 6, 3, 12, 45, 0, 0).toISOString());
+  });
+
+  it("uses the current ISO datetime when hero start is immediate", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-26T10:30:00.000Z"));
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: "article-2", slug: "immediate-hero-story" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    fillRequiredFields();
+    fireEvent.change(screen.getByPlaceholderText("Slug"), {
+      target: { value: "immediate-hero-story" },
+    });
+    fireEvent.change(getHeroSliderSelect(), { target: { value: "yes" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rest/articles",
+      expect.objectContaining({ method: "POST" }),
+    );
+
+    const requestBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(requestBody.heroStartAt).toBe("2026-06-26T10:30:00.000Z");
+    expect(requestBody.heroEndAt).toBeNull();
+    expect(requestBody.heroPriority).toBe(100);
+  });
+
+  it("requires end date and time when auto-removal is enabled", async () => {
+    const user = userEvent.setup();
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    fillRequiredFields();
+    fireEvent.change(getHeroSliderSelect(), { target: { value: "yes" } });
+    await user.click(screen.getByRole("button", { name: /Schedule start/i }));
+    fireEvent.change(screen.getByLabelText("Start Date"), {
+      target: { value: "2026-06-26" },
+    });
+    fireEvent.change(screen.getByLabelText("Start Time"), {
+      target: { value: "11:30" },
+    });
+    await user.click(screen.getByRole("checkbox", { name: /Remove from hero automatically/i }));
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByText("Publishing failed.")).toBeVisible();
+    expect(screen.getAllByText("End date is required when auto-removal is enabled.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("End time is required when auto-removal is enabled.").length).toBeGreaterThan(0);
+  });
+
+  it("hydrates existing ISO hero dates into the schedule controls", () => {
+    render(
+      createElement(NewsroomEditor, {
+        initialArticle: {
+          id: "article-10",
+          title: "Edited story",
+          slug: "edited-story",
+          excerpt: "Existing excerpt with enough detail to satisfy editorial validation rules.",
+          status: "DRAFT",
+          editionCode: "UNITED_STATES",
+          categorySlugs: ["technology"],
+          showOnHero: true,
+          heroStartAt: "2026-06-26T11:30:00.000Z",
+          heroEndAt: "2026-07-03T12:45:00.000Z",
+          heroPriority: 7,
+        },
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    const expectedStart = getLocalDateAndTimeParts("2026-06-26T11:30:00.000Z");
+    const expectedEnd = getLocalDateAndTimeParts("2026-07-03T12:45:00.000Z");
+
+    expect(screen.getByText("Homepage Hero Schedule")).toBeVisible();
+    expect(screen.getByLabelText("Start Date")).toHaveValue(expectedStart.date);
+    expect(screen.getByLabelText("Start Time")).toHaveValue(expectedStart.time);
+    expect(screen.getByRole("checkbox", { name: /Remove from hero automatically/i })).toBeChecked();
+    expect(screen.getByLabelText("End Date")).toHaveValue(expectedEnd.date);
+    expect(screen.getByLabelText("End Time")).toHaveValue(expectedEnd.time);
+    expect(screen.getByLabelText("Hero Priority")).toHaveValue(7);
+  });
+
+  it("shows a field-level error when hero end is before hero start", async () => {
+    const user = userEvent.setup();
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    fillRequiredFields();
+    fireEvent.change(getHeroSliderSelect(), { target: { value: "yes" } });
+    await user.click(screen.getByRole("button", { name: /Schedule start/i }));
+    fireEvent.change(screen.getByLabelText("Start Date"), {
+      target: { value: "2026-06-26" },
+    });
+    fireEvent.change(screen.getByLabelText("Start Time"), {
+      target: { value: "11:30" },
+    });
+    await user.click(screen.getByRole("checkbox", { name: /Remove from hero automatically/i }));
+    fireEvent.change(screen.getByLabelText("End Date"), {
+      target: { value: "2026-06-26" },
+    });
+    fireEvent.change(screen.getByLabelText("End Time"), {
+      target: { value: "10:30" },
+    });
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByText("Publishing failed.")).toBeVisible();
+    expect(screen.getAllByText("Hero End must be after Hero Start.").length).toBeGreaterThan(0);
   });
 
   it("uses PATCH when editing an existing article id", async () => {

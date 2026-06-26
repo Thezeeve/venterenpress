@@ -1,34 +1,54 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ARTICLE_IMAGE_MAX_BYTES,
   articleBodyToEditorHtml,
   buildArticlePayload,
   extractApiFieldErrors,
+  getEditorFieldErrors,
   htmlToArticleBody,
   validateEditorIssues,
   validateArticleImageFile,
   validateEditorValues,
+  type EditorFormValues,
 } from "@/lib/article-editor";
 
+function createEditorValues(overrides: Partial<EditorFormValues> = {}): EditorFormValues {
+  return {
+    title: "Global chip alliances reshape AI infrastructure competition",
+    slug: "global-chip-alliances",
+    excerpt: "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+    categories: "technology, finance",
+    tags: "ai, chips",
+    editionCode: "UNITED_STATES",
+    seoTitle: "",
+    seoDescription: "",
+    featuredImageUrl: "",
+    featuredImageAlt: "",
+    showOnHero: false,
+    heroStartMode: "immediate",
+    heroStartDate: "",
+    heroStartTime: "",
+    heroEndEnabled: false,
+    heroEndDate: "",
+    heroEndTime: "",
+    heroPriority: "",
+    ...overrides,
+  };
+}
+
 describe("article editor helpers", () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
   it("validates required newsroom fields", () => {
     const error = validateEditorValues(
-      {
+      createEditorValues({
         title: "Short",
         slug: "",
         excerpt: "Too short",
         categories: "",
-        tags: "",
-        editionCode: "AFRICA",
-        seoTitle: "",
-        seoDescription: "",
-        featuredImageUrl: "",
-        featuredImageAlt: "",
-        showOnHero: false,
-        heroStartAt: "",
-        heroEndAt: "",
-        heroPriority: "",
-      },
+      }),
       "<p></p>",
     );
 
@@ -62,24 +82,22 @@ describe("article editor helpers", () => {
     }
   });
 
-  it("builds published payloads for the article API", () => {
+  it("builds published payloads for scheduled homepage hero articles", () => {
     const payload = buildArticlePayload(
-      {
-        title: "Global chip alliances reshape AI infrastructure competition",
-        slug: "",
-        excerpt: "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
-        categories: "technology, finance",
-        tags: "ai, chips",
-        editionCode: "UNITED_STATES",
+      createEditorValues({
+        showOnHero: true,
+        heroStartMode: "scheduled",
+        heroStartDate: "2026-06-23",
+        heroStartTime: "09:00",
+        heroEndEnabled: true,
+        heroEndDate: "2026-06-24",
+        heroEndTime: "09:00",
+        heroPriority: "3",
         seoTitle: "AI infrastructure competition",
         seoDescription: "A briefing on AI infrastructure competition.",
         featuredImageUrl: "https://example.com/image.jpg",
         featuredImageAlt: "Data center exterior",
-        showOnHero: true,
-        heroStartAt: "2026-06-23T09:00",
-        heroEndAt: "2026-06-24T09:00",
-        heroPriority: "3",
-      },
+      }),
       "<p>Lead paragraph.</p>",
       "publish",
     );
@@ -99,24 +117,34 @@ describe("article editor helpers", () => {
     expect(payload.heroPriority).toBe(3);
   });
 
+  it("uses the current ISO datetime when hero start is immediate", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-26T10:30:00.000Z"));
+
+    const payload = buildArticlePayload(
+      createEditorValues({
+        showOnHero: true,
+      }),
+      "<p>Lead paragraph.</p>",
+      "draft",
+    );
+
+    expect(payload.heroStartAt).toBe("2026-06-26T10:30:00.000Z");
+    expect(payload.heroEndAt).toBeNull();
+    expect(payload.heroPriority).toBe(100);
+  });
+
   it("normalizes blank optional fields to null instead of empty strings", () => {
     const payload = buildArticlePayload(
-      {
-        title: "Global chip alliances reshape AI infrastructure competition",
-        slug: "global-chip-alliances",
-        excerpt: "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+      createEditorValues({
         categories: "technology",
         tags: "",
-        editionCode: "UNITED_STATES",
         seoTitle: "   ",
         seoDescription: "   ",
         featuredImageUrl: "   ",
         featuredImageAlt: "   ",
         showOnHero: false,
-        heroStartAt: "",
-        heroEndAt: "",
-        heroPriority: "",
-      },
+      }),
       "<p>Lead paragraph.</p>",
       "draft",
     );
@@ -152,28 +180,49 @@ describe("article editor helpers", () => {
   });
 
   it("returns a visible validation issue list for blocked publish actions", () => {
-    expect(validateEditorIssues({
+    expect(validateEditorIssues(createEditorValues({
       title: "",
       slug: "",
       excerpt: "",
       categories: "",
-      tags: "",
-      editionCode: "AFRICA",
-      seoTitle: "",
-      seoDescription: "",
-      featuredImageUrl: "",
-      featuredImageAlt: "",
-      showOnHero: false,
-      heroStartAt: "",
-      heroEndAt: "",
-      heroPriority: "",
-    }, "<p></p>")).toEqual([
+    }), "<p></p>")).toEqual([
       "Title required.",
       "Slug required.",
       "Summary required.",
       "Category required.",
       "Body required.",
     ]);
+  });
+
+  it("requires end date and time when hero auto-removal is enabled", () => {
+    expect(getEditorFieldErrors(
+      createEditorValues({
+        showOnHero: true,
+        heroStartMode: "scheduled",
+        heroStartDate: "2026-06-26",
+        heroStartTime: "11:30",
+        heroEndEnabled: true,
+      }),
+      "<p>Lead paragraph.</p>",
+    )).toMatchObject({
+      heroEndDate: ["End date is required when auto-removal is enabled."],
+      heroEndTime: ["End time is required when auto-removal is enabled."],
+    });
+  });
+
+  it("shows a field-level error when hero end is before hero start", () => {
+    expect(getEditorFieldErrors(
+      createEditorValues({
+        showOnHero: true,
+        heroStartMode: "scheduled",
+        heroStartDate: "2026-06-26",
+        heroStartTime: "11:30",
+        heroEndEnabled: true,
+        heroEndDate: "2026-06-26",
+        heroEndTime: "10:30",
+      }),
+      "<p>Lead paragraph.</p>",
+    ).heroEndDate).toContain("Hero End must be after Hero Start.");
   });
 
   it("surfaces backend field errors in editor field names", () => {
@@ -186,7 +235,7 @@ describe("article editor helpers", () => {
       },
     })).toEqual({
       categories: ["Choose at least one category."],
-      heroStartAt: ["Hero Start date is invalid."],
+      heroStartDate: ["Hero Start date is invalid."],
     });
   });
 });

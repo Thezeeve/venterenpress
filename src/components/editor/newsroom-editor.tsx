@@ -63,12 +63,21 @@ type EditorInitialArticle = {
   isHomepageHero?: boolean;
 };
 
-function toDateTimeLocalValue(value?: string | null) {
+function toDateAndTimeParts(value?: string | null) {
   if (!value) {
-    return "";
+    return { date: "", time: "" };
   }
 
-  return new Date(value).toISOString().slice(0, 16);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return { date: "", time: "" };
+  }
+
+  const pad = (input: number) => String(input).padStart(2, "0");
+  return {
+    date: `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
+    time: `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`,
+  };
 }
 
 export function NewsroomEditor({
@@ -99,8 +108,20 @@ export function NewsroomEditor({
   const [featuredImageUrl, setFeaturedImageUrl] = useState(initialArticle?.featuredImageUrl ?? "");
   const [featuredImageAlt, setFeaturedImageAlt] = useState(initialArticle?.featuredImageAlt ?? "");
   const [showOnHero, setShowOnHero] = useState(initialArticle?.showOnHero ?? false);
-  const [heroStartAt, setHeroStartAt] = useState(toDateTimeLocalValue(initialArticle?.heroStartAt));
-  const [heroEndAt, setHeroEndAt] = useState(toDateTimeLocalValue(initialArticle?.heroEndAt));
+  const initialHeroStart = toDateAndTimeParts(initialArticle?.heroStartAt);
+  const initialHeroEnd = toDateAndTimeParts(initialArticle?.heroEndAt);
+  const [heroStartMode, setHeroStartMode] = useState<"immediate" | "scheduled">(
+    initialArticle?.showOnHero
+      ? initialArticle?.heroStartAt
+        ? "scheduled"
+        : "immediate"
+      : "immediate",
+  );
+  const [heroStartDate, setHeroStartDate] = useState(initialHeroStart.date);
+  const [heroStartTime, setHeroStartTime] = useState(initialHeroStart.time);
+  const [heroEndEnabled, setHeroEndEnabled] = useState(Boolean(initialArticle?.heroEndAt));
+  const [heroEndDate, setHeroEndDate] = useState(initialHeroEnd.date);
+  const [heroEndTime, setHeroEndTime] = useState(initialHeroEnd.time);
   const [heroPriority, setHeroPriority] = useState(initialArticle?.heroPriority?.toString() ?? "");
   const [imagePreviewUrl, setImagePreviewUrl] = useState(initialArticle?.featuredImageUrl ?? "");
   const [imageFileName, setImageFileName] = useState("");
@@ -430,8 +451,12 @@ export function NewsroomEditor({
       featuredImageUrl,
       featuredImageAlt,
       showOnHero,
-      heroStartAt,
-      heroEndAt,
+      heroStartMode,
+      heroStartDate,
+      heroStartTime,
+      heroEndEnabled,
+      heroEndDate,
+      heroEndTime,
       heroPriority,
     };
     const nextFieldErrors = getEditorFieldErrors(editorValues, editor.getHTML());
@@ -471,8 +496,12 @@ export function NewsroomEditor({
           featuredImageUrl: featuredImageUrlRef.current,
           featuredImageAlt,
           showOnHero,
-          heroStartAt,
-          heroEndAt,
+          heroStartMode,
+          heroStartDate,
+          heroStartTime,
+          heroEndEnabled,
+          heroEndDate,
+          heroEndTime,
           heroPriority,
         },
         editor.getHTML(),
@@ -852,44 +881,6 @@ export function NewsroomEditor({
                   <option value="yes">Yes</option>
                 </Select>
               </div>
-
-              <div className="space-y-2">
-                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Hero Start</div>
-                <Input
-                  type="datetime-local"
-                  value={heroStartAt}
-                  onChange={(event) => setHeroStartAt(event.target.value)}
-                  aria-invalid={Boolean(getFieldError("heroStartAt"))}
-                  className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
-                />
-                {getFieldError("heroStartAt") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroStartAt")}</p> : null}
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Hero End</div>
-                <Input
-                  type="datetime-local"
-                  value={heroEndAt}
-                  onChange={(event) => setHeroEndAt(event.target.value)}
-                  aria-invalid={Boolean(getFieldError("heroEndAt"))}
-                  className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
-                />
-                {getFieldError("heroEndAt") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroEndAt")}</p> : null}
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Hero Priority</div>
-                <Input
-                  type="number"
-                  min="0"
-                  placeholder="Optional"
-                  value={heroPriority}
-                  onChange={(event) => setHeroPriority(event.target.value)}
-                  aria-invalid={Boolean(getFieldError("heroPriority"))}
-                  className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
-                />
-                {getFieldError("heroPriority") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroPriority")}</p> : null}
-              </div>
             </div>
 
             <div className="space-y-3">
@@ -948,6 +939,142 @@ export function NewsroomEditor({
             </div>
           </CardContent>
         </Card>
+
+        {showOnHero ? (
+          <Card className="rounded-[30px] border-[rgba(15,23,42,0.08)] bg-[rgba(255,255,255,0.9)] shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+            <CardContent className="space-y-5 p-5">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">Homepage Hero Schedule</h2>
+                <p className="text-sm text-[var(--muted-foreground)]">Control when this article appears in the homepage hero slider without exposing raw datetime strings.</p>
+              </div>
+
+              <div className="rounded-[20px] bg-[rgba(243,240,234,0.88)] p-4 text-sm">
+                <div className="font-medium text-[var(--foreground)]">Homepage Hero enabled</div>
+                <div className="mt-1 text-[var(--muted-foreground)]">The article will be eligible for hero placement using the schedule below.</div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Hero Start</div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setHeroStartMode("immediate")}
+                    className={`rounded-[18px] border px-4 py-3 text-left text-sm transition ${
+                      heroStartMode === "immediate"
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--foreground)]"
+                        : "border-[rgba(15,23,42,0.08)] bg-white text-[var(--muted-foreground)]"
+                    }`}
+                  >
+                    <div className="font-medium text-[var(--foreground)]">Start immediately</div>
+                    <div className="mt-1 text-xs text-[var(--muted-foreground)]">Uses the current datetime internally at save/publish time.</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHeroStartMode("scheduled")}
+                    className={`rounded-[18px] border px-4 py-3 text-left text-sm transition ${
+                      heroStartMode === "scheduled"
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--foreground)]"
+                        : "border-[rgba(15,23,42,0.08)] bg-white text-[var(--muted-foreground)]"
+                    }`}
+                  >
+                    <div className="font-medium text-[var(--foreground)]">Schedule start</div>
+                    <div className="mt-1 text-xs text-[var(--muted-foreground)]">Choose the exact date and time this article should enter the hero slider.</div>
+                  </button>
+                </div>
+                {heroStartMode === "scheduled" ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label htmlFor="hero-start-date" className="text-sm font-medium text-[var(--foreground)]">Start Date</label>
+                      <Input
+                        id="hero-start-date"
+                        type="date"
+                        value={heroStartDate}
+                        onChange={(event) => setHeroStartDate(event.target.value)}
+                        aria-invalid={Boolean(getFieldError("heroStartDate"))}
+                        className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
+                      />
+                      {getFieldError("heroStartDate") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroStartDate")}</p> : null}
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="hero-start-time" className="text-sm font-medium text-[var(--foreground)]">Start Time</label>
+                      <Input
+                        id="hero-start-time"
+                        type="time"
+                        value={heroStartTime}
+                        onChange={(event) => setHeroStartTime(event.target.value)}
+                        aria-invalid={Boolean(getFieldError("heroStartTime"))}
+                        className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
+                      />
+                      {getFieldError("heroStartTime") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroStartTime")}</p> : null}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--muted-foreground)]">The hero start timestamp will be generated automatically when you save or publish.</p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 rounded-[18px] border border-[rgba(15,23,42,0.08)] bg-white px-4 py-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={heroEndEnabled}
+                    onChange={(event) => setHeroEndEnabled(event.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-[var(--border)] text-[var(--accent)]"
+                  />
+                  <span>
+                    <span className="block font-medium text-[var(--foreground)]">Remove from hero automatically</span>
+                    <span className="mt-1 block text-[var(--muted-foreground)]">Set an end date and time if this article should leave the homepage hero automatically.</span>
+                  </span>
+                </label>
+
+                {heroEndEnabled ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label htmlFor="hero-end-date" className="text-sm font-medium text-[var(--foreground)]">End Date</label>
+                      <Input
+                        id="hero-end-date"
+                        type="date"
+                        value={heroEndDate}
+                        onChange={(event) => setHeroEndDate(event.target.value)}
+                        aria-invalid={Boolean(getFieldError("heroEndDate"))}
+                        className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
+                      />
+                      {getFieldError("heroEndDate") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroEndDate")}</p> : null}
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="hero-end-time" className="text-sm font-medium text-[var(--foreground)]">End Time</label>
+                      <Input
+                        id="hero-end-time"
+                        type="time"
+                        value={heroEndTime}
+                        onChange={(event) => setHeroEndTime(event.target.value)}
+                        aria-invalid={Boolean(getFieldError("heroEndTime"))}
+                        className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
+                      />
+                      {getFieldError("heroEndTime") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroEndTime")}</p> : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="hero-priority" className="text-sm font-medium text-[var(--foreground)]">Hero Priority</label>
+                <Input
+                  id="hero-priority"
+                  type="number"
+                  min="0"
+                  placeholder="100"
+                  value={heroPriority}
+                  onChange={(event) => setHeroPriority(event.target.value)}
+                  aria-invalid={Boolean(getFieldError("heroPriority"))}
+                  className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
+                />
+                <p className="text-sm text-[var(--muted-foreground)]">Higher priority appears first. If left blank, the editor submits `100`.</p>
+                {getFieldError("heroPriority") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroPriority")}</p> : null}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <details className="group rounded-[28px] border border-[rgba(15,23,42,0.08)] bg-[rgba(255,255,255,0.86)] shadow-[0_18px_44px_rgba(15,23,42,0.05)]">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">

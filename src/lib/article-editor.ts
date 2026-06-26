@@ -13,8 +13,12 @@ export type EditorFormValues = {
   featuredImageUrl: string;
   featuredImageAlt: string;
   showOnHero: boolean;
-  heroStartAt: string;
-  heroEndAt: string;
+  heroStartMode: "immediate" | "scheduled";
+  heroStartDate: string;
+  heroStartTime: string;
+  heroEndEnabled: boolean;
+  heroEndDate: string;
+  heroEndTime: string;
   heroPriority: string;
 };
 
@@ -27,6 +31,8 @@ export type EditorFieldErrors = Partial<Record<EditorFieldName, string[]>>;
 const payloadFieldToEditorField: Partial<Record<string, EditorFieldName>> = {
   categorySlugs: "categories",
   tagSlugs: "tags",
+  heroStartAt: "heroStartDate",
+  heroEndAt: "heroEndDate",
 };
 
 export const ARTICLE_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
@@ -156,6 +162,17 @@ function normalizeDateTimeInput(value: string) {
   return parsed.toISOString();
 }
 
+function combineDateAndTime(dateValue: string, timeValue: string) {
+  const normalizedDate = dateValue.trim();
+  const normalizedTime = timeValue.trim();
+
+  if (!normalizedDate || !normalizedTime) {
+    return null;
+  }
+
+  return normalizeDateTimeInput(`${normalizedDate}T${normalizedTime}`);
+}
+
 function pushFieldError(fieldErrors: EditorFieldErrors, field: EditorFieldName, message: string) {
   const existing = fieldErrors[field] ?? [];
   if (!existing.includes(message)) {
@@ -178,6 +195,14 @@ function shouldSkipSchemaMessage(values: EditorFormValues, field: EditorFieldNam
 
   if (field === "categories" && !splitCommaSeparated(values.categories).length) {
     return message.includes("at least one category");
+  }
+
+  if (field === "heroStartDate" && values.showOnHero && values.heroStartMode === "scheduled") {
+    return message.includes("Hero Start date is invalid") && (!values.heroStartDate.trim() || !values.heroStartTime.trim());
+  }
+
+  if (field === "heroEndDate" && values.showOnHero && values.heroEndEnabled) {
+    return message.includes("Hero End date is invalid") && (!values.heroEndDate.trim() || !values.heroEndTime.trim());
   }
 
   return false;
@@ -299,6 +324,7 @@ export function flattenEditorFieldErrors(fieldErrors: EditorFieldErrors) {
 
 export function getEditorFieldErrors(values: EditorFormValues, bodyHtml: string) {
   const fieldErrors: EditorFieldErrors = {};
+  const normalizedHeroPriority = normalizeOptionalInteger(values.heroPriority);
 
   if (!values.title.trim()) {
     pushFieldError(fieldErrors, "title", "Title required.");
@@ -326,6 +352,53 @@ export function getEditorFieldErrors(values: EditorFormValues, bodyHtml: string)
     pushFieldError(fieldErrors, "body", "Body required.");
   }
 
+  if (values.showOnHero) {
+    if (values.heroStartMode === "scheduled") {
+      if (!values.heroStartDate.trim()) {
+        pushFieldError(fieldErrors, "heroStartDate", "Start date is required when scheduling hero start.");
+      }
+
+      if (!values.heroStartTime.trim()) {
+        pushFieldError(fieldErrors, "heroStartTime", "Start time is required when scheduling hero start.");
+      }
+    }
+
+    if (values.heroEndEnabled) {
+      if (!values.heroEndDate.trim()) {
+        pushFieldError(fieldErrors, "heroEndDate", "End date is required when auto-removal is enabled.");
+      }
+
+      if (!values.heroEndTime.trim()) {
+        pushFieldError(fieldErrors, "heroEndTime", "End time is required when auto-removal is enabled.");
+      }
+    }
+
+    if (values.heroPriority.trim() && Number.isNaN(normalizedHeroPriority)) {
+      pushFieldError(fieldErrors, "heroPriority", "Hero Priority must be a valid number.");
+    }
+
+    const heroStartAt = values.heroStartMode === "scheduled"
+      ? combineDateAndTime(values.heroStartDate, values.heroStartTime)
+      : new Date().toISOString();
+    const heroEndAt = values.heroEndEnabled
+      ? combineDateAndTime(values.heroEndDate, values.heroEndTime)
+      : null;
+
+    if (values.heroStartMode === "scheduled" && values.heroStartDate.trim() && values.heroStartTime.trim() && heroStartAt === `${values.heroStartDate}T${values.heroStartTime}`) {
+      pushFieldError(fieldErrors, "heroStartDate", "Hero Start date is invalid.");
+    }
+
+    if (values.heroEndEnabled && values.heroEndDate.trim() && values.heroEndTime.trim() && heroEndAt === `${values.heroEndDate}T${values.heroEndTime}`) {
+      pushFieldError(fieldErrors, "heroEndDate", "Hero End date is invalid.");
+    }
+
+    if (heroStartAt && heroEndAt && heroStartAt !== `${values.heroStartDate}T${values.heroStartTime}` && heroEndAt !== `${values.heroEndDate}T${values.heroEndTime}`) {
+      if (new Date(heroEndAt).getTime() <= new Date(heroStartAt).getTime()) {
+        pushFieldError(fieldErrors, "heroEndDate", "Hero End must be after Hero Start.");
+      }
+    }
+  }
+
   const payload = buildArticlePayload(values, bodyHtml, "draft");
   const parsed = articleInputSchema.safeParse(payload);
   if (!parsed.success) {
@@ -346,6 +419,15 @@ export function getEditorFieldErrors(values: EditorFormValues, bodyHtml: string)
 
 export function buildArticlePayload(values: EditorFormValues, bodyHtml: string, intent: EditorSubmitIntent) {
   const normalizedSlug = normalizeSlug(values.slug.trim() || values.title);
+  const normalizedHeroPriority = normalizeOptionalInteger(values.heroPriority);
+  const heroStartAt = values.showOnHero
+    ? values.heroStartMode === "scheduled"
+      ? combineDateAndTime(values.heroStartDate, values.heroStartTime)
+      : new Date().toISOString()
+    : null;
+  const heroEndAt = values.showOnHero && values.heroEndEnabled
+    ? combineDateAndTime(values.heroEndDate, values.heroEndTime)
+    : null;
 
   return {
     title: values.title.trim(),
@@ -369,9 +451,13 @@ export function buildArticlePayload(values: EditorFormValues, bodyHtml: string, 
     videoUrl: null,
     audioUrl: null,
     showOnHero: values.showOnHero,
-    heroStartAt: normalizeDateTimeInput(values.heroStartAt),
-    heroEndAt: normalizeDateTimeInput(values.heroEndAt),
-    heroPriority: normalizeOptionalInteger(values.heroPriority),
+    heroStartAt,
+    heroEndAt,
+    heroPriority: values.showOnHero
+      ? Number.isNaN(normalizedHeroPriority)
+        ? null
+        : normalizedHeroPriority ?? 100
+      : null,
   };
 }
 
