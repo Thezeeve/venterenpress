@@ -60,6 +60,10 @@ Use this checklist before exposing Global Press Network to public traffic.
 - Verify article trust surfaces: fact-check labels, source transparency, correction history, review status, and share cards.
 - Verify personalization surfaces for authenticated readers: recommendations, continue reading, newsletter preferences, and alert preferences.
 - Verify media-kit and press-release commercial flows for copy, pricing, and intake links.
+- Never run mutating editor QA against the live production database.
+- Run article create/edit/publish QA only against isolated local or staging data.
+- Any temporary QA article must use a unique `qa-temp-` slug prefix and be soft-deleted automatically after the test completes.
+- Keep publish-path smoke tests opt-in via `E2E_ALLOW_EDITOR_MUTATIONS=true`; leave them disabled by default.
 
 ## Domain and SSL
 

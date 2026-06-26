@@ -2,7 +2,15 @@ import { expect, test } from "@playwright/test";
 
 test.setTimeout(90_000);
 
-test("seeded admin can log in and access editor routes", async ({ page }) => {
+test("seeded admin can log in and save an isolated draft safely", async ({ page, context, baseURL }) => {
+  test.skip(
+    process.env.E2E_ALLOW_EDITOR_MUTATIONS !== "true",
+    "Mutating editor QA is disabled by default. Only enable this against isolated local or staging data.",
+  );
+
+  const origin = new URL(baseURL ?? "http://127.0.0.1:3000").origin;
+  let articleId: string | null = null;
+
   await page.goto("/login");
 
   const signInCard = page.getByRole("heading", { name: "Sign in" }).locator("..").locator("..");
@@ -19,17 +27,37 @@ test("seeded admin can log in and access editor routes", async ({ page }) => {
   await page.goto("/admin/articles/new");
   await expect(page.getByRole("heading", { name: /new article/i })).toBeVisible();
 
-  const uniqueSlug = `seeded-admin-${Date.now()}`;
+  const uniqueSlug = `qa-temp-${Date.now()}`;
   await page.getByPlaceholder("Article headline").fill("Seeded admin workflow verification article");
   await page.getByPlaceholder("Slug").fill(uniqueSlug);
   await page.getByPlaceholder("Excerpt").fill("This seeded admin validation draft confirms protected editorial publishing access works correctly.");
   await page.locator(".tiptap").fill("This is a seeded admin validation article body with enough content to satisfy the editor workflow.");
   await page.getByPlaceholder("Categories, comma separated").fill("technology");
 
-  await page.getByRole("button", { name: "Save Draft" }).click();
-  await expect(page.getByText("Draft saved successfully.")).toBeVisible({ timeout: 30_000 });
+  try {
+    const createResponsePromise = page.waitForResponse((response) =>
+      response.url().includes("/api/rest/articles") && response.request().method() === "POST",
+    );
 
-  await page.getByRole("button", { name: "Publish" }).click();
-  await expect(page.getByText("Article published successfully.")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("link", { name: "View published article" })).toHaveAttribute("href", `/articles/${uniqueSlug}`);
+    await page.getByRole("button", { name: "Save Draft" }).click();
+    await expect(page.getByText("Draft saved successfully.")).toBeVisible({ timeout: 30_000 });
+
+    const createResponse = await createResponsePromise;
+    const payload = await createResponse.json();
+    articleId = payload?.data?.id ?? null;
+
+    expect(articleId).toBeTruthy();
+    await expect(page).toHaveURL(/\/admin\/articles\/[^/]+$/);
+  } finally {
+    if (articleId) {
+      const cleanupResponse = await context.request.delete(`${origin}/api/rest/articles/${articleId}`, {
+        headers: {
+          origin,
+          referer: `${origin}/admin/articles/${articleId}`,
+        },
+      });
+
+      expect(cleanupResponse.ok()).toBeTruthy();
+    }
+  }
 });
