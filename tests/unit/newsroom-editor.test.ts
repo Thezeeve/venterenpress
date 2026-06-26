@@ -200,6 +200,8 @@ describe("NewsroomEditor upload support", () => {
 
     const requestBody = JSON.parse((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string);
     expect(requestBody.featuredImageUrl).toBe("https://cdn.example.com/images/article.png");
+    expect(requestBody.seoTitle).toBeNull();
+    expect(requestBody.seoDescription).toBeNull();
   }, 15000);
 
   it("shows a publishing loading state and success feedback", async () => {
@@ -284,6 +286,52 @@ describe("NewsroomEditor upload support", () => {
     expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
   }, 15000);
 
+  it("shows backend field-level validation errors", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: "Invalid article payload",
+        issues: {
+          fieldErrors: {
+            seoTitle: ["SEO Title must be 70 characters or fewer."],
+            heroStartAt: ["Hero Start date is invalid."],
+          },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
+      target: { value: "Global chip alliances reshape AI infrastructure competition" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Slug"), {
+      target: { value: "global-chip-alliances" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
+      target: {
+        value:
+          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+      },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
+      target: { value: "technology" },
+    });
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect((await screen.findAllByText("SEO Title must be 70 characters or fewer.")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Hero Start date is invalid.").length).toBeGreaterThan(0);
+  }, 15000);
+
   it("shows visible validation issues when publish is blocked", async () => {
     const user = userEvent.setup();
 
@@ -298,10 +346,10 @@ describe("NewsroomEditor upload support", () => {
     await user.click(screen.getByRole("button", { name: "Publish" }));
 
     expect(await screen.findByText("Publishing failed.")).toBeVisible();
-    expect(screen.getByText("Title required.")).toBeVisible();
-    expect(screen.getByText("Slug required.")).toBeVisible();
-    expect(screen.getByText("Summary required.")).toBeVisible();
-    expect(screen.getByText("Category required.")).toBeVisible();
+    expect(screen.getAllByText("Title required.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Slug required.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Summary required.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Category required.").length).toBeGreaterThan(0);
   });
 
   it("keeps manual image url fallback working", async () => {
@@ -348,6 +396,57 @@ describe("NewsroomEditor upload support", () => {
 
     const requestBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
     expect(requestBody.featuredImageUrl).toBe("https://cdn.example.com/manual.jpg");
+  });
+
+  it("normalizes hero scheduling values to ISO before submit", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: "article-2", slug: "scheduled-story" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      createElement(NewsroomEditor, {
+        categoryOptions,
+        editionOptions,
+        currentUserRole: Role.MANAGING_EDITOR,
+      }),
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Article headline"), {
+      target: { value: "Global chip alliances reshape AI infrastructure competition" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Slug"), {
+      target: { value: "scheduled-story" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Excerpt"), {
+      target: {
+        value:
+          "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+      },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Categories, comma separated"), {
+      target: { value: "technology" },
+    });
+    const datetimeInputs = document.querySelectorAll('input[type="datetime-local"]');
+    fireEvent.change(datetimeInputs[0] as HTMLInputElement, {
+      target: { value: "2026-06-26T11:30" },
+    });
+    fireEvent.change(datetimeInputs[1] as HTMLInputElement, {
+      target: { value: "2026-07-03T12:45" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/rest/articles",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const requestBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(requestBody.heroStartAt).toBe(new Date(2026, 5, 26, 11, 30, 0, 0).toISOString());
+    expect(requestBody.heroEndAt).toBe(new Date(2026, 6, 3, 12, 45, 0, 0).toISOString());
   });
 
   it("uses PATCH when editing an existing article id", async () => {

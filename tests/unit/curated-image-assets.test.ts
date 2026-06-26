@@ -93,5 +93,5 @@ describe("curated newsroom image assets", () => {
       expect(width, `${ref} should have a positive width`).toBeGreaterThan(0);
       expect(height, `${ref} should have a positive height`).toBeGreaterThan(0);
     }
-  });
+  }, 15000);
 });

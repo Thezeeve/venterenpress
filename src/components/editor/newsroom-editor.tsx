@@ -29,10 +29,12 @@ import {
   ARTICLE_IMAGE_ACCEPT,
   articleBodyToEditorHtml,
   buildArticlePayload,
+  extractApiFieldErrors,
   extractApiErrorMessage,
+  getEditorFieldErrors,
+  type EditorFieldName,
   htmlToArticleBody,
-  validateEditorIssues,
-  validateEditorValues,
+  flattenEditorFieldErrors,
   validateArticleImageFile,
 } from "@/lib/article-editor";
 import { hasPermission } from "@/lib/rbac";
@@ -116,6 +118,7 @@ export function NewsroomEditor({
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<EditorFieldName, string[]>>>({});
   const [currentArticleId, setCurrentArticleId] = useState(articleId ?? initialArticle?.id ?? "");
   const [publicArticleHref, setPublicArticleHref] = useState(
     initialArticle?.slug && initialArticle?.status === "PUBLISHED" ? `/articles/${initialArticle.slug}` : "",
@@ -152,6 +155,10 @@ export function NewsroomEditor({
     }
 
     console.info(label, payload);
+  }
+
+  function getFieldError(field: EditorFieldName) {
+    return fieldErrors[field]?.[0] ?? "";
   }
 
   useEffect(() => {
@@ -409,6 +416,7 @@ export function NewsroomEditor({
     setErrorMessage("");
     setSuccessMessage("");
     setValidationIssues([]);
+    setFieldErrors({});
 
     const editorValues = {
       title,
@@ -426,19 +434,17 @@ export function NewsroomEditor({
       heroEndAt,
       heroPriority,
     };
-    const issues = validateEditorIssues(editorValues, editor.getHTML());
+    const nextFieldErrors = getEditorFieldErrors(editorValues, editor.getHTML());
+    const issues = flattenEditorFieldErrors(nextFieldErrors);
 
-    const validationError = validateEditorValues(
-      editorValues,
-      editor.getHTML(),
-    );
-
-    if (validationError) {
+    if (issues.length) {
       logSubmitDebug("Article validation blocked submit", {
         intent,
         issues,
+        fieldErrors: nextFieldErrors,
       });
       setErrorMessage(intent === "publish" ? "Publishing failed." : "Draft save failed.");
+      setFieldErrors(nextFieldErrors);
       setValidationIssues(issues);
       return;
     }
@@ -496,10 +502,13 @@ export function NewsroomEditor({
         body: responseBody,
       });
       if (!response.ok) {
+        const nextFieldErrors = extractApiFieldErrors(responseBody);
         const reason = extractApiErrorMessage(
           responseBody,
           intent === "publish" ? "Unable to publish article." : "Unable to save draft.",
         );
+        setFieldErrors(nextFieldErrors);
+        setValidationIssues(flattenEditorFieldErrors(nextFieldErrors));
         setErrorMessage(`${intent === "publish" ? "Publishing failed" : "Draft save failed"}. ${reason}`);
         setSubmitState("idle");
         setAutosaveStatus(intent === "publish" ? "Publish failed" : "Draft save failed");
@@ -570,8 +579,10 @@ export function NewsroomEditor({
                 placeholder="Article headline"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
+                aria-invalid={Boolean(getFieldError("title"))}
                 className="h-14 rounded-[22px] border-[rgba(15,23,42,0.08)] bg-white px-5 text-lg font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
               />
+              {getFieldError("title") ? <p className="text-sm text-[#8A1C16]">{getFieldError("title")}</p> : null}
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -583,8 +594,10 @@ export function NewsroomEditor({
                   placeholder="Slug"
                   value={slug}
                   onChange={(event) => setSlug(event.target.value)}
+                  aria-invalid={Boolean(getFieldError("slug"))}
                   className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
                 />
+                {getFieldError("slug") ? <p className="text-sm text-[#8A1C16]">{getFieldError("slug")}</p> : null}
               </div>
               <div className="space-y-2">
                 <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
@@ -595,8 +608,10 @@ export function NewsroomEditor({
                   value={categories}
                   onChange={(event) => setCategories(event.target.value)}
                   list="category-options"
+                  aria-invalid={Boolean(getFieldError("categories"))}
                   className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
                 />
+                {getFieldError("categories") ? <p className="text-sm text-[#8A1C16]">{getFieldError("categories")}</p> : null}
                 <datalist id="category-options">
                   {categoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </datalist>
@@ -611,8 +626,10 @@ export function NewsroomEditor({
                 placeholder="Excerpt"
                 value={excerpt}
                 onChange={(event) => setExcerpt(event.target.value)}
+                aria-invalid={Boolean(getFieldError("excerpt"))}
                 className="min-h-[110px] rounded-[22px] border-[rgba(15,23,42,0.08)] bg-white px-5 py-4 leading-7"
               />
+              {getFieldError("excerpt") ? <p className="text-sm text-[#8A1C16]">{getFieldError("excerpt")}</p> : null}
             </div>
           </CardContent>
         </Card>
@@ -757,7 +774,10 @@ export function NewsroomEditor({
             </div>
 
             {activeView === "compose" ? (
-              <EditorContent editor={editor} />
+              <div className="space-y-2">
+                <EditorContent editor={editor} />
+                {getFieldError("body") ? <p className="text-sm text-[#8A1C16]">{getFieldError("body")}</p> : null}
+              </div>
             ) : (
               <div>
                 <div className="mb-4 flex items-center gap-3">
@@ -811,8 +831,10 @@ export function NewsroomEditor({
                   value={categories}
                   onChange={(event) => setCategories(event.target.value)}
                   list="category-options"
+                  aria-invalid={Boolean(getFieldError("categories"))}
                   className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
                 />
+                {getFieldError("categories") ? <p className="text-sm text-[#8A1C16]">{getFieldError("categories")}</p> : null}
               </div>
 
               <div className="space-y-2">
@@ -820,6 +842,7 @@ export function NewsroomEditor({
                 <Select value={editionCode} onChange={(event) => setEditionCode(event.target.value)}>
                   {editionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </Select>
+                {getFieldError("editionCode") ? <p className="text-sm text-[#8A1C16]">{getFieldError("editionCode")}</p> : null}
               </div>
 
               <div className="space-y-2">
@@ -836,8 +859,10 @@ export function NewsroomEditor({
                   type="datetime-local"
                   value={heroStartAt}
                   onChange={(event) => setHeroStartAt(event.target.value)}
+                  aria-invalid={Boolean(getFieldError("heroStartAt"))}
                   className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
                 />
+                {getFieldError("heroStartAt") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroStartAt")}</p> : null}
               </div>
 
               <div className="space-y-2">
@@ -846,8 +871,10 @@ export function NewsroomEditor({
                   type="datetime-local"
                   value={heroEndAt}
                   onChange={(event) => setHeroEndAt(event.target.value)}
+                  aria-invalid={Boolean(getFieldError("heroEndAt"))}
                   className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
                 />
+                {getFieldError("heroEndAt") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroEndAt")}</p> : null}
               </div>
 
               <div className="space-y-2">
@@ -858,8 +885,10 @@ export function NewsroomEditor({
                   placeholder="Optional"
                   value={heroPriority}
                   onChange={(event) => setHeroPriority(event.target.value)}
+                  aria-invalid={Boolean(getFieldError("heroPriority"))}
                   className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4"
                 />
+                {getFieldError("heroPriority") ? <p className="text-sm text-[#8A1C16]">{getFieldError("heroPriority")}</p> : null}
               </div>
             </div>
 
@@ -929,8 +958,14 @@ export function NewsroomEditor({
             <ChevronDown className="h-4 w-4 text-[var(--muted-foreground)] transition-transform group-open:rotate-180" />
           </summary>
           <div className="space-y-4 px-5 pb-5">
-            <Input placeholder="SEO title" value={seoTitle} onChange={(event) => setSeoTitle(event.target.value)} className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4" />
-            <Textarea placeholder="Meta description" value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} className="min-h-[120px] rounded-[20px] border-[rgba(15,23,42,0.08)] bg-white px-4 py-3" />
+            <div className="space-y-2">
+              <Input placeholder="SEO title" value={seoTitle} onChange={(event) => setSeoTitle(event.target.value)} aria-invalid={Boolean(getFieldError("seoTitle"))} className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4" />
+              {getFieldError("seoTitle") ? <p className="text-sm text-[#8A1C16]">{getFieldError("seoTitle")}</p> : null}
+            </div>
+            <div className="space-y-2">
+              <Textarea placeholder="Meta description" value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} aria-invalid={Boolean(getFieldError("seoDescription"))} className="min-h-[120px] rounded-[20px] border-[rgba(15,23,42,0.08)] bg-white px-4 py-3" />
+              {getFieldError("seoDescription") ? <p className="text-sm text-[#8A1C16]">{getFieldError("seoDescription")}</p> : null}
+            </div>
           </div>
         </details>
 
@@ -946,6 +981,7 @@ export function NewsroomEditor({
             <div className="space-y-2">
               <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Tags</div>
               <Input placeholder="Tags, comma separated" value={tags} onChange={(event) => setTags(event.target.value)} className="h-12 rounded-[18px] border-[rgba(15,23,42,0.08)] bg-white px-4" />
+              {getFieldError("tags") ? <p className="text-sm text-[#8A1C16]">{getFieldError("tags")}</p> : null}
             </div>
             <div className="rounded-[20px] bg-[rgba(243,240,234,0.88)] p-4 text-sm text-[var(--muted-foreground)]">
               <div className="flex items-center gap-2 font-medium text-[var(--foreground)]">

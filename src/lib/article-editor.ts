@@ -1,4 +1,5 @@
 import { normalizeSlug, slugify } from "@/lib/utils";
+import { articleInputSchema } from "@/lib/validation";
 
 export type EditorFormValues = {
   title: string;
@@ -18,6 +19,15 @@ export type EditorFormValues = {
 };
 
 export type EditorSubmitIntent = "draft" | "publish";
+export type EditorFieldName =
+  | keyof EditorFormValues
+  | "body";
+export type EditorFieldErrors = Partial<Record<EditorFieldName, string[]>>;
+
+const payloadFieldToEditorField: Partial<Record<string, EditorFieldName>> = {
+  categorySlugs: "categories",
+  tagSlugs: "tags",
+};
 
 export const ARTICLE_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
 export const ARTICLE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -92,6 +102,85 @@ export function splitCommaSeparated(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizeOptionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
+
+function normalizeOptionalInteger(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (!/^-?\d+$/.test(trimmed)) {
+    return Number.NaN;
+  }
+
+  return Number.parseInt(trimmed, 10);
+}
+
+function normalizeDateTimeInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    const [datePart, timePart] = trimmed.split("T");
+    const [year, month, day] = datePart.split("-").map((part) => Number.parseInt(part, 10));
+    const [hour, minute] = timePart.split(":").map((part) => Number.parseInt(part, 10));
+    const normalized = new Date(year, month - 1, day, hour, minute, 0, 0);
+
+    if (
+      Number.isNaN(normalized.getTime())
+      || normalized.getFullYear() !== year
+      || normalized.getMonth() !== month - 1
+      || normalized.getDate() !== day
+      || normalized.getHours() !== hour
+      || normalized.getMinutes() !== minute
+    ) {
+      return trimmed;
+    }
+
+    return normalized.toISOString();
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return trimmed;
+  }
+
+  return parsed.toISOString();
+}
+
+function pushFieldError(fieldErrors: EditorFieldErrors, field: EditorFieldName, message: string) {
+  const existing = fieldErrors[field] ?? [];
+  if (!existing.includes(message)) {
+    fieldErrors[field] = [...existing, message];
+  }
+}
+
+function shouldSkipSchemaMessage(values: EditorFormValues, field: EditorFieldName, message: string) {
+  if (field === "title" && !values.title.trim()) {
+    return message.includes("at least 10 characters");
+  }
+
+  if (field === "slug" && !values.slug.trim()) {
+    return message.includes("at least 3 characters");
+  }
+
+  if (field === "excerpt" && !values.excerpt.trim()) {
+    return message.includes("at least 20 characters");
+  }
+
+  if (field === "categories" && !splitCommaSeparated(values.categories).length) {
+    return message.includes("at least one category");
+  }
+
+  return false;
 }
 
 export function validateArticleImageFile(file: File) {
@@ -201,35 +290,58 @@ export function validateEditorValues(values: EditorFormValues, bodyHtml: string)
 }
 
 export function validateEditorIssues(values: EditorFormValues, bodyHtml: string) {
-  const issues: string[] = [];
+  return flattenEditorFieldErrors(getEditorFieldErrors(values, bodyHtml));
+}
+
+export function flattenEditorFieldErrors(fieldErrors: EditorFieldErrors) {
+  return Object.values(fieldErrors).flat();
+}
+
+export function getEditorFieldErrors(values: EditorFormValues, bodyHtml: string) {
+  const fieldErrors: EditorFieldErrors = {};
 
   if (!values.title.trim()) {
-    issues.push("Title required.");
+    pushFieldError(fieldErrors, "title", "Title required.");
   } else if (values.title.trim().length < 10) {
-    issues.push("Title must be at least 10 characters.");
+    pushFieldError(fieldErrors, "title", "Title must be at least 10 characters.");
   }
 
   if (!values.slug.trim()) {
-    issues.push("Slug required.");
+    pushFieldError(fieldErrors, "slug", "Slug required.");
   } else if (values.slug.trim().length < 3) {
-    issues.push("Slug must be at least 3 characters.");
+    pushFieldError(fieldErrors, "slug", "Slug must be at least 3 characters.");
   }
 
   if (!values.excerpt.trim()) {
-    issues.push("Summary required.");
+    pushFieldError(fieldErrors, "excerpt", "Summary required.");
   } else if (values.excerpt.trim().length < 20) {
-    issues.push("Excerpt must be at least 20 characters.");
+    pushFieldError(fieldErrors, "excerpt", "Excerpt must be at least 20 characters.");
   }
 
   if (!splitCommaSeparated(values.categories).length) {
-    issues.push("Category required.");
+    pushFieldError(fieldErrors, "categories", "Category required.");
   }
 
   if (!bodyHtml.replace(/<[^>]+>/g, "").trim()) {
-    issues.push("Body required.");
+    pushFieldError(fieldErrors, "body", "Body required.");
   }
 
-  return issues;
+  const payload = buildArticlePayload(values, bodyHtml, "draft");
+  const parsed = articleInputSchema.safeParse(payload);
+  if (!parsed.success) {
+    const flattened = parsed.error.flatten().fieldErrors;
+    for (const [fieldName, messages] of Object.entries(flattened)) {
+      const editorFieldName = payloadFieldToEditorField[fieldName] ?? (fieldName as EditorFieldName);
+      for (const message of messages ?? []) {
+        if (shouldSkipSchemaMessage(values, editorFieldName, message)) {
+          continue;
+        }
+        pushFieldError(fieldErrors, editorFieldName, message);
+      }
+    }
+  }
+
+  return fieldErrors;
 }
 
 export function buildArticlePayload(values: EditorFormValues, bodyHtml: string, intent: EditorSubmitIntent) {
@@ -244,29 +356,67 @@ export function buildArticlePayload(values: EditorFormValues, bodyHtml: string, 
     status: intent === "publish" ? "PUBLISHED" : "DRAFT",
     accessTier: "FREE",
     articleType: "NEWS",
-    editionCode: values.editionCode,
+    editionCode: values.editionCode.trim(),
     categorySlugs: splitCommaSeparated(values.categories),
     tagSlugs: splitCommaSeparated(values.tags),
-    seoTitle: values.seoTitle.trim(),
-    seoDescription: values.seoDescription.trim(),
+    seoTitle: normalizeOptionalText(values.seoTitle),
+    seoDescription: normalizeOptionalText(values.seoDescription),
     featured: false,
     breaking: false,
     scheduledFor: null,
-    featuredImageUrl: values.featuredImageUrl.trim(),
-    featuredImageAlt: values.featuredImageAlt.trim(),
-    videoUrl: "",
-    audioUrl: "",
+    featuredImageUrl: normalizeOptionalText(values.featuredImageUrl),
+    featuredImageAlt: normalizeOptionalText(values.featuredImageAlt),
+    videoUrl: null,
+    audioUrl: null,
     showOnHero: values.showOnHero,
-    heroStartAt: values.heroStartAt.trim() || null,
-    heroEndAt: values.heroEndAt.trim() || null,
-    heroPriority: values.heroPriority.trim() ? Number.parseInt(values.heroPriority.trim(), 10) : null,
+    heroStartAt: normalizeDateTimeInput(values.heroStartAt),
+    heroEndAt: normalizeDateTimeInput(values.heroEndAt),
+    heroPriority: normalizeOptionalInteger(values.heroPriority),
   };
 }
 
 export function extractApiErrorMessage(payload: unknown, fallback: string) {
+  const fieldErrors = extractApiFieldErrors(payload);
+  const firstFieldError = flattenEditorFieldErrors(fieldErrors)[0];
+
   if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
+    if (payload.error === "Invalid article payload" && firstFieldError) {
+      return firstFieldError;
+    }
+
     return payload.error;
   }
 
+  if (firstFieldError) {
+    return firstFieldError;
+  }
+
   return fallback;
+}
+
+export function extractApiFieldErrors(payload: unknown) {
+  if (!payload || typeof payload !== "object" || !("issues" in payload)) {
+    return {};
+  }
+
+  const issues = payload.issues;
+  if (!issues || typeof issues !== "object" || !("fieldErrors" in issues) || typeof issues.fieldErrors !== "object" || !issues.fieldErrors) {
+    return {};
+  }
+
+  const fieldErrors: EditorFieldErrors = {};
+  for (const [fieldName, messages] of Object.entries(issues.fieldErrors as Record<string, unknown>)) {
+    if (!Array.isArray(messages)) {
+      continue;
+    }
+
+    const editorFieldName = payloadFieldToEditorField[fieldName] ?? (fieldName as EditorFieldName);
+    for (const message of messages) {
+      if (typeof message === "string" && message.trim()) {
+        pushFieldError(fieldErrors, editorFieldName, message);
+      }
+    }
+  }
+
+  return fieldErrors;
 }

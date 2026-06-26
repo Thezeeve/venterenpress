@@ -3,6 +3,7 @@ import {
   ARTICLE_IMAGE_MAX_BYTES,
   articleBodyToEditorHtml,
   buildArticlePayload,
+  extractApiFieldErrors,
   htmlToArticleBody,
   validateEditorIssues,
   validateArticleImageFile,
@@ -90,8 +91,43 @@ describe("article editor helpers", () => {
       type: "doc",
       content: [{ type: "paragraph", text: "Lead paragraph." }],
     });
+    expect(payload.seoTitle).toBe("AI infrastructure competition");
+    expect(payload.seoDescription).toBe("A briefing on AI infrastructure competition.");
     expect(payload.showOnHero).toBe(true);
+    expect(payload.heroStartAt).toBe(new Date(2026, 5, 23, 9, 0, 0, 0).toISOString());
+    expect(payload.heroEndAt).toBe(new Date(2026, 5, 24, 9, 0, 0, 0).toISOString());
     expect(payload.heroPriority).toBe(3);
+  });
+
+  it("normalizes blank optional fields to null instead of empty strings", () => {
+    const payload = buildArticlePayload(
+      {
+        title: "Global chip alliances reshape AI infrastructure competition",
+        slug: "global-chip-alliances",
+        excerpt: "Governments and hyperscale platforms are redrawing semiconductor strategy around energy, supply chains, and sovereign cloud capacity.",
+        categories: "technology",
+        tags: "",
+        editionCode: "UNITED_STATES",
+        seoTitle: "   ",
+        seoDescription: "   ",
+        featuredImageUrl: "   ",
+        featuredImageAlt: "   ",
+        showOnHero: false,
+        heroStartAt: "",
+        heroEndAt: "",
+        heroPriority: "",
+      },
+      "<p>Lead paragraph.</p>",
+      "draft",
+    );
+
+    expect(payload.seoTitle).toBeNull();
+    expect(payload.seoDescription).toBeNull();
+    expect(payload.featuredImageUrl).toBeNull();
+    expect(payload.featuredImageAlt).toBeNull();
+    expect(payload.heroStartAt).toBeNull();
+    expect(payload.heroEndAt).toBeNull();
+    expect(payload.heroPriority).toBeNull();
   });
 
   it("serializes stored article body back into editor html", () => {
@@ -138,5 +174,19 @@ describe("article editor helpers", () => {
       "Category required.",
       "Body required.",
     ]);
+  });
+
+  it("surfaces backend field errors in editor field names", () => {
+    expect(extractApiFieldErrors({
+      issues: {
+        fieldErrors: {
+          categorySlugs: ["Choose at least one category."],
+          heroStartAt: ["Hero Start date is invalid."],
+        },
+      },
+    })).toEqual({
+      categories: ["Choose at least one category."],
+      heroStartAt: ["Hero Start date is invalid."],
+    });
   });
 });
