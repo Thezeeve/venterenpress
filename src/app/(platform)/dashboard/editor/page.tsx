@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
 import { prisma } from "@/lib/prisma";
 import { requireDashboardUser } from "@/lib/server-auth";
+import { normalizeSlug } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -30,11 +32,30 @@ function formatUpdatedAt(value: Date) {
   }).format(value);
 }
 
-export default async function EditorDashboardPage() {
+export default async function EditorDashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ q?: string }>;
+}) {
   const user = await requireDashboardUser("articleCreate");
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const query = String(resolvedSearchParams?.q ?? "").trim();
+  const normalizedQuery = normalizeSlug(query);
   const [articles, categories, editions] = await Promise.all([
     prisma.article.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        ...(query
+          ? {
+              OR: [
+                { slug: normalizedQuery || query.toLowerCase() },
+                { slug: { contains: normalizedQuery || query.toLowerCase(), mode: "insensitive" } },
+                { title: { contains: query, mode: "insensitive" } },
+                { excerpt: { contains: query, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
       include: {
         author: true,
         edition: true,
@@ -42,13 +63,14 @@ export default async function EditorDashboardPage() {
         tags: { include: { tag: true } },
       },
       orderBy: { updatedAt: "desc" },
-      take: 12,
+      take: query ? 24 : 12,
     }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.edition.findMany({ orderBy: { name: "asc" } }),
   ]);
 
-  const recentArticles = articles.filter((article) => !isDemoArticle(article)).slice(0, 6);
+  const visibleArticles = articles.filter((article) => !isDemoArticle(article));
+  const recentArticles = query ? visibleArticles : visibleArticles.slice(0, 6);
 
   return (
     <main
@@ -77,11 +99,34 @@ export default async function EditorDashboardPage() {
       />
 
       <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold text-[var(--foreground)]">Recent Articles</h2>
-          <p className="text-sm text-[var(--muted-foreground)]">
-            Open recent drafts and published pieces without leaving the editorial workspace.
-          </p>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold text-[var(--foreground)]">
+              {query ? "Search Results" : "Recent Articles"}
+            </h2>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              {query
+                ? "Find an existing article by slug, title, or excerpt and open it without recreating the record."
+                : "Open recent drafts and published pieces without leaving the editorial workspace."}
+            </p>
+          </div>
+          <form className="flex flex-col gap-3 sm:flex-row" action="/dashboard/editor" method="get">
+            <Input
+              name="q"
+              defaultValue={query}
+              placeholder="Search by article slug or title"
+              aria-label="Search articles by slug or title"
+              className="h-11"
+            />
+            <div className="flex gap-3">
+              <Button type="submit" variant="outline">Find Article</Button>
+              {query ? (
+                <Button asChild variant="ghost">
+                  <Link href="/dashboard/editor">Clear</Link>
+                </Button>
+              ) : null}
+            </div>
+          </form>
         </div>
         <Card className="rounded-[30px] border-[rgba(15,23,42,0.08)] bg-[rgba(255,255,255,0.8)] shadow-[0_24px_60px_rgba(15,23,42,0.06)]">
           <CardContent className="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
@@ -115,8 +160,12 @@ export default async function EditorDashboardPage() {
               </div>
             )) : (
               <EmptyState
-                title="No recent articles"
-                description="Newly created drafts and published newsroom stories will appear here."
+                title={query ? "No matching articles" : "No recent articles"}
+                description={
+                  query
+                    ? "No existing article matched that slug or title. Refine the search before creating anything new."
+                    : "Newly created drafts and published newsroom stories will appear here."
+                }
               />
             )}
           </CardContent>
